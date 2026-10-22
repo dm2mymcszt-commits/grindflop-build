@@ -1,0 +1,263 @@
+import i18n from "../../../i18n";
+import type { BrowseCard, ManagedOption } from "../GridPage.types";
+import {
+	formatDistanceForUnits,
+	formatHeightForUnits,
+	formatWeightForUnits,
+	type UnitsPreset,
+} from "../../../utils/units";
+import { formatRelativeTime } from "../../../utils/relativeTime";
+
+type AccountCreationAnchor = {
+	time: number;
+	id: number;
+};
+
+const ACCOUNT_CREATION_ANCHORS: readonly AccountCreationAnchor[] = [
+	{ time: 1238563200, id: 0 },
+	{ time: 1285027200, id: 1000000 },
+	{ time: 1462924800, id: 35512000 },
+	{ time: 1501804800, id: 132076000 },
+	{ time: 1546547829, id: 201948000 },
+	{ time: 1618531200, id: 351220000 },
+	{ time: 1636150385, id: 390338000 },
+	{ time: 1637963460, id: 394800000 },
+	{ time: 1680393600, id: 505225000 },
+	{ time: 1717200000, id: 630495000 },
+	{ time: 1717372800, id: 634942000 },
+	{ time: 1729950240, id: 699724000 },
+	{ time: 1732986600, id: 710609000 },
+	{ time: 1733349060, id: 711676000 },
+	{ time: 1735229820, id: 718934000 },
+	{ time: 1738065780, id: 730248000 },
+	{ time: 1739059200, id: 733779000 },
+	{ time: 1741564800, id: 744008000 },
+];
+
+function parseProfileId(profileId: string | number | null | undefined): number | null {
+	if (typeof profileId === "number") {
+		return Number.isFinite(profileId) ? profileId : null;
+	}
+
+	if (typeof profileId === "string") {
+		const parsed = Number(profileId.trim());
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+
+	return null;
+}
+
+export function estimateAccountCreationTimestamp(
+	profileId: string | number | null | undefined,
+): number | null {
+	const id = parseProfileId(profileId);
+	if (id == null || id < 0) {
+		return null;
+	}
+
+	const first = ACCOUNT_CREATION_ANCHORS[0];
+	const last = ACCOUNT_CREATION_ANCHORS[ACCOUNT_CREATION_ANCHORS.length - 1];
+
+	let left = first;
+	let right = ACCOUNT_CREATION_ANCHORS[1];
+
+	if (id >= last.id) {
+		left = ACCOUNT_CREATION_ANCHORS[ACCOUNT_CREATION_ANCHORS.length - 2];
+		right = last;
+	} else {
+		for (let i = 0; i < ACCOUNT_CREATION_ANCHORS.length - 1; i += 1) {
+			const current = ACCOUNT_CREATION_ANCHORS[i];
+			const next = ACCOUNT_CREATION_ANCHORS[i + 1];
+
+			if (id >= current.id && id <= next.id) {
+				left = current;
+				right = next;
+				break;
+			}
+		}
+	}
+
+	const idRange = right.id - left.id;
+	if (idRange <= 0) {
+		return null;
+	}
+
+	const progress = (id - left.id) / idRange;
+	const estimateSeconds = left.time + progress * (right.time - left.time);
+
+	return Math.round(estimateSeconds * 1000);
+}
+
+const dateTimeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function getDateTimeFormatter(lng: string, options: Intl.DateTimeFormatOptions) {
+	const key = `${lng}-${JSON.stringify(options)}`;
+	if (!dateTimeFormatterCache.has(key)) {
+		dateTimeFormatterCache.set(key, new Intl.DateTimeFormat(lng, options));
+	}
+	return dateTimeFormatterCache.get(key)!;
+}
+
+export function formatEstimatedAccountCreation(
+	profileId: string | number | null | undefined,
+	t?: (key: string, options?: any) => string,
+): string {
+	const timestamp = estimateAccountCreationTimestamp(profileId);
+	if (timestamp == null) {
+		return t ? t("browse_page.unknown") : "Unknown";
+	}
+
+	const formatter = getDateTimeFormatter(i18n.language, {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	});
+
+	return formatter.format(new Date(timestamp));
+}
+
+export function formatProfilePhotoCreatedAt(
+	timestamp: number | null | undefined,
+	t?: (key: string, options?: any) => string,
+): string {
+	if (!timestamp || !Number.isFinite(timestamp)) {
+		return t ? t("browse_page.unknown") : "Unknown";
+	}
+
+	const formatter = getDateTimeFormatter(i18n.language, {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		hour: "numeric",
+		minute: "2-digit",
+	});
+
+	return formatter.format(new Date(timestamp));
+}
+
+export function formatTravelDateRange(startMs: number, endMs: number): string {
+	const dayFormatter = getDateTimeFormatter(i18n.language, { month: "short", day: "numeric" });
+	const dayYearFormatter = getDateTimeFormatter(i18n.language, {
+		month: "short",
+		day: "numeric",
+		year: "numeric",
+	});
+	const start = new Date(startMs);
+	const end = new Date(endMs);
+	const sameYear = start.getFullYear() === end.getFullYear();
+	const startLabel = sameYear ? dayFormatter.format(start) : dayYearFormatter.format(start);
+	const endLabel = dayYearFormatter.format(end);
+	return `${startLabel} – ${endLabel}`;
+}
+
+export function formatDistance(
+	distanceMeters: number | null | undefined,
+	t?: (key: string, options?: any) => string,
+	unitsPreset: UnitsPreset = "world",
+): string {
+	return formatDistanceForUnits(distanceMeters, unitsPreset, t);
+}
+
+export function isCurrentlyOnline(
+	onlineUntil: number | null | undefined,
+): boolean {
+	if (!onlineUntil || !Number.isFinite(onlineUntil)) {
+		return false;
+	}
+
+	return onlineUntil > Date.now();
+}
+
+export { getOnlineStatusMeta, type OnlineStatusMeta } from "../../../utils/onlineStatus";
+
+export function getDisplayName(card: BrowseCard): string {
+	const value = card.displayName?.trim();
+	if (value) {
+		return value;
+	}
+
+	return ``;
+}
+
+export function getCardInitials(name: string): string {
+	const parts = name.split(/\s+/).filter(Boolean).slice(0, 2);
+
+	if (parts.length === 0) {
+		return "?";
+	}
+
+	return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
+export function formatTimeAgo(
+	timestamp: number | null | undefined,
+	t?: (key: string, options?: any) => string,
+): string {
+	const formatted = formatRelativeTime(timestamp);
+	if (!formatted && t) return t("browse_page.unknown");
+	return formatted || "Unknown";
+}
+
+// The "Not set" strings below are internal sentinels consumed by
+// shouldHideField, never shown to the user (every call site is gated by it),
+// so they must stay untranslated — translating them broke hiding for any
+// non-English locale, since shouldHideField only matched the English string.
+
+export function formatOptionalNumber(
+	value: number | null | undefined,
+	_t?: (key: string, options?: any) => string,
+): string {
+	if (value == null || !Number.isFinite(value)) {
+		return "Not set";
+	}
+
+	return String(value);
+}
+
+export function formatEnumValue(
+	value: number | null | undefined,
+	labels: Record<number, string>,
+	_t?: (key: string, options?: any) => string,
+): string {
+	if (value == null || !Number.isFinite(value)) {
+		return "Not set";
+	}
+
+	return labels[value] ?? String(value);
+}
+
+export function formatEnumArray(
+	values: number[],
+	labels: Record<number, string>,
+	_t?: (key: string, options?: any) => string,
+): string {
+	if (values.length === 0) {
+		return "Not set";
+	}
+
+	return values.map((value) => labels[value] ?? String(value)).join(", ");
+}
+
+export function formatHeightCm(
+	value: number | null | undefined,
+	t?: (key: string, options?: any) => string,
+	unitsPreset: UnitsPreset = "world",
+): string {
+	return formatHeightForUnits(value, unitsPreset, t);
+}
+
+export function formatWeightKg(
+	value: number | null | undefined,
+	t?: (key: string, options?: any) => string,
+	unitsPreset: UnitsPreset = "world",
+): string {
+	return formatWeightForUnits(value, unitsPreset, t);
+}
+
+export function shouldHideField(formattedValue: string | undefined): boolean {
+	return !formattedValue || formattedValue === "Not set";
+}
+
+export function getEnumLabel(value: number, options: ManagedOption[]): string {
+	return options.find((opt) => opt.value === value)?.label ?? String(value);
+}

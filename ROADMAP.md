@@ -1,0 +1,69 @@
+# Free Grind roadmap
+
+## Features
+
+- [x] Authentication
+  - [x] Password-based
+  - [ ] Sign-in with Google
+- [x] Geo service
+  - [x] Location self-reporting
+  - [x] Manual location picker (map + search)
+  - [x] Current device location detection (mobile)
+- [x] Messaging
+  - [x] Text messages
+  - [x] Read indicators
+  - [x] Media
+    - [x] Images (send & receive)
+    - [x] Videos (send & receive)
+    - [x] Audio messages (receive/playback)
+    - [x] Audio message recording
+    - [x] Albums (view, share, manage)
+    - [ ] GIF / Gaymoji
+  - [x] Location messages
+  - [x] Saved phrases
+  - [x] Reactions (send & receive)
+  - [x] Unsend messages
+  - [x] Delete messages (local)
+  - [x] Pin / unpin conversations
+  - [x] Mute / unmute conversations
+  - [x] Inbox filters (unread, favorites, chemistry, right now, online)
+  - [x] Conversation search (local)
+  - [x] Message search (local)
+  - [x] Profile search from chat
+  - [x] Replies (UI)
+- [x] Profiles
+  - [x] Fetching & viewing
+  - [x] Full profile detail modal (stats, health, tribes, tags, photos)
+  - [x] Favoriting/unfavoriting
+  - [x] Blocking/unblocking
+  - [x] Taps
+  - [ ] Reports
+- [x] Grid
+  - [x] Cascade profile grid
+  - [x] Profile detail from grid
+  - [x] Limit bypass
+  - [x] Filtering
+- [x] Albums
+  - [x] View own albums
+  - [x] Create albums
+  - [x] Upload media to albums
+  - [x] Reorder album content
+  - [x] Delete album content
+  - [x] Delete albums
+  - [x] Share albums in chat
+- [ ] Interest section
+  - [x] Views history
+  - [ ] Profile view self-reporting
+  - [x] Taps history
+- [ ] "Right now"
+  - [x] Fetching
+  - [x] Filtering
+  - [x] Sorting
+  - [x] Posting
+- [x] Account
+  - [x] Profile editing (bio, stats, health, tribes, tags, social links)
+  - [x] Manage profile photos (upload, reorder, delete)
+  - [ ] Settings management (email, password, privacy)
+- [x] Push notifications
+
+## Known issues

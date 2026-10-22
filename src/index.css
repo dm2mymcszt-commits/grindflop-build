@@ -1,0 +1,1450 @@
+@import "tailwindcss";
+
+/* Hide scrollbars globally */
+* {
+	-ms-overflow-style: none !important;  /* IE and Edge */
+	scrollbar-width: none !important;  /* Firefox */
+}
+::-webkit-scrollbar {
+	display: none !important;  /* Chrome, Safari, Opera */
+}
+
+@theme {
+	--color-accent: var(--accent);
+
+	/* Tap animations */
+	--animate-tap-burst: tap-burst 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+	--animate-ignite: ignite-vertical 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+	--animate-flash: flash-burst 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	--animate-ripple: ripple-out 0.8s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+	--animate-living-loop: living-emoji 4s ease-in-out infinite;
+	--animate-living-flame-loop: living-emoji 4s ease-in-out infinite, super-pulse 4s ease-in-out infinite;
+	--animate-halo-loop: halo-loop 4s ease-in-out infinite;
+
+	/* "They just viewed you" emphasis on the profile view badge */
+	--animate-viewed-now-ring: viewed-now-ring 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+	--animate-viewed-now-eye: viewed-now-eye 1.8s ease-in-out infinite;
+
+	/* Modal animations */
+	--animate-modal-in: modal-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	--animate-modal-out: modal-out 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	--animate-modal-top-in: modal-top-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	--animate-modal-top-out: modal-top-out 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	--animate-backdrop-in: backdrop-in 0.35s ease-out forwards;
+	--animate-backdrop-out: backdrop-out 0.25s ease-in forwards;
+	--animate-tooltip-in: tooltip-in 0.2s ease-out forwards;
+	--animate-search-in: search-in 0.3s ease-out forwards;
+	--animate-badge-in: badge-in 0.3s ease-out forwards;
+	--animate-morph-glow: morph-glow 8s ease-in-out infinite;
+	--animate-spin: spin 1s linear infinite;
+	--animate-fade-in: fade-in 0.4s ease-out forwards;
+	--animate-fade-in-subtle: fade-in-subtle 0.4s ease-out both;
+	/* backwards, not both: holding the last keyframe leaves every revealed item
+	   with a filter and a transform for good, each its own compositing layer. */
+	/* A message pulsing after a reply quote was tapped to reach it */
+	--animate-jump-highlight-mine: jump-highlight-mine 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+	--animate-jump-highlight-other: jump-highlight-other 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+	--animate-reveal-row: reveal-row 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+	--animate-progress-indeterminate: progress-indeterminate 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+
+	@keyframes morph-glow {
+		0%, 100% {
+			transform: scale(1) translate(0, 0);
+			border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+		}
+		25% {
+			transform: scale(1.1) translate(5%, 5%);
+			border-radius: 40% 60% 50% 50% / 50% 60% 40% 50%;
+		}
+		50% {
+			transform: scale(1.2) translate(-5%, 10%);
+			border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%;
+		}
+		75% {
+			transform: scale(1.1) translate(-10%, -5%);
+			border-radius: 60% 40% 50% 50% / 40% 40% 60% 60%;
+		}
+	}
+
+	@keyframes badge-in {
+		from { opacity: 0; transform: translateY(8px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	@keyframes search-in {
+		from { opacity: 0; transform: translateX(20px) scale(0.98); }
+		to { opacity: 1; transform: translateX(0) scale(1); }
+	}
+
+	@keyframes tooltip-in {
+		from { opacity: 0; transform: translateY(-8px) scale(0.95) translateX(-12px); }
+		to { opacity: 1; transform: translateY(0) scale(1) translateX(-12px); }
+	}
+	@keyframes modal-in {
+		from { opacity: 0; transform: scale(0.92) translateY(15px); }
+		to { opacity: 1; transform: scale(1) translateY(0) translateZ(0.1px); }
+	}
+	@keyframes modal-out {
+		from { opacity: 1; transform: scale(1) translateY(0) translateZ(0.1px); }
+		to { opacity: 0; transform: scale(0.92) translateY(15px); }
+	}
+	@keyframes modal-top-in {
+		from { opacity: 0; transform: scale(0.92) translateY(-15px); }
+		to { opacity: 1; transform: scale(1) translateY(0) translateZ(0.1px); }
+	}
+	@keyframes modal-top-out {
+		from { opacity: 1; transform: scale(1) translateY(0) translateZ(0.1px); }
+		to { opacity: 0; transform: scale(0.92) translateY(-15px); }
+	}
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+	@keyframes fade-in {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	@keyframes fade-in-subtle {
+		from { opacity: 0; }
+		to { opacity: 0.4; }
+	}
+	@keyframes progress-indeterminate {
+		0% { transform: translateX(-100%); }
+		100% { transform: translateX(350%); }
+	}
+	@keyframes jump-highlight-mine {
+		0% { transform: translateX(0); opacity: 1; }
+		30% { transform: translateX(-13px); opacity: 0.6; }
+		60% { transform: translateX(2px); opacity: 1; }
+		100% { transform: translateX(0); opacity: 1; }
+	}
+	@keyframes jump-highlight-other {
+		0% { transform: translateX(0); opacity: 1; }
+		30% { transform: translateX(13px); opacity: 0.6; }
+		60% { transform: translateX(-2px); opacity: 1; }
+		100% { transform: translateX(0); opacity: 1; }
+	}
+	@keyframes reveal-row {
+		from {
+			opacity: 0;
+			transform: translateY(var(--reveal-translate-y, 40px)) scale(var(--reveal-scale, 0.92));
+			filter: blur(var(--reveal-blur, 4px));
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0) scale(1);
+			filter: blur(0);
+		}
+	}
+    @keyframes backdrop-in {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	@keyframes backdrop-out {
+		from { opacity: 1; }
+		to { opacity: 0; }
+	}
+
+	@keyframes ripple-out {
+		0% {
+			transform: scale(1);
+			opacity: 1;
+			border-width: 3px;
+		}
+		100% {
+			transform: scale(2.4);
+			opacity: 0;
+			border-width: 0px;
+		}
+	}
+	@keyframes ignite-vertical {
+		0% {
+			transform: scale(1) translateY(0) rotate(0deg);
+		}
+		10% {
+			transform: scale(1.2) translateY(-1px) rotate(-10deg);
+		}
+		20% {
+			transform: scale(1.05) translateY(4px) rotate(0deg);
+		}
+        30% {
+            transform: scale(1.1) translateY(2px) rotate(0deg);
+        }
+		100% {
+			transform: scale(1.15) translateY(2px) rotate(0deg);
+		}
+	}
+	@keyframes flash-burst {
+		0% {
+			transform: scale(0.6);
+			opacity: 0;
+			filter: blur(2px);
+		}
+		15% {
+			transform: scale(2.2);
+			opacity: 1;
+			filter: blur(4px);
+		}
+		45% {
+			transform: scale(1);
+			opacity: 0.5;
+			filter: blur(8px);
+		}
+		100% {
+			transform: scale(0.9);
+			opacity: 0.3;
+			filter: blur(4px);
+		}
+	}
+	@keyframes living-emoji {
+    		0%,
+    		100% {
+    			transform: scale(1.15) translateY(2px) rotate(0deg);
+
+    		}
+    		50% {
+    			transform: scale(1.2) translateY(0px) rotate(3deg);
+
+
+    		}
+    	}
+    @keyframes super-pulse {
+        0%, 100% {
+            filter: brightness(1.2) saturate(1);
+        }
+        50% {
+            filter: brightness(1.8) saturate(1.4);
+        }
+    }
+	@keyframes halo-loop {
+		0%,
+		100% {
+			opacity: 0.3;
+			transform: scale(0.9);
+			filter: blur(4px);
+		}
+		50% {
+			opacity: 0.45;
+			transform: scale(1.1);
+			filter: blur(6px);
+		}
+	}
+
+	/* Ring that pings outward from behind the eye icon while a view is fresh. */
+	@keyframes viewed-now-ring {
+		0% {
+			transform: scale(0.55);
+			opacity: 0.7;
+		}
+		65%,
+		100% {
+			transform: scale(1.9);
+			opacity: 0;
+		}
+	}
+	/* Matching pop on the eye itself, timed to the ring's leading edge. */
+	@keyframes viewed-now-eye {
+		0%,
+		40%,
+		100% {
+			transform: scale(1);
+		}
+		14% {
+			transform: scale(1.3);
+		}
+	}
+
+    /* Chat animations */
+	@keyframes fire-pill-pop {
+
+		0% {
+			transform: translateY(1px) scale(0.92);
+		}
+		55% {
+			transform: translateY(-1px) scale(1.08);
+		}
+		100% {
+			transform: translateY(0) scale(1);
+		}
+	}
+	@keyframes fire-flame-idle {
+		0%   { transform: rotate(-2deg) scale(1); }
+		50%  { transform: rotate(2deg) scale(1.06); }
+		100% { transform: rotate(-2deg) scale(1); }
+	}
+
+	@keyframes fire-flame-flicker {
+		0% {
+			transform: rotate(-14deg) scale(0.82);
+			filter: saturate(1.1);
+		}
+		40% {
+			transform: rotate(10deg) scale(1.2);
+			filter: saturate(1.45);
+		}
+		70% {
+			transform: rotate(-4deg) scale(1.02);
+		}
+		100% {
+			transform: rotate(0deg) scale(1);
+			filter: saturate(1);
+		}
+	}
+	@keyframes fire-ring {
+		0% {
+			transform: scale(0.55);
+			opacity: 0.78;
+		}
+		100% {
+			transform: scale(1.45);
+			opacity: 0;
+		}
+	}
+
+	@keyframes tap-burst {
+		0%   { transform: translate(-50%, -50%) scale(0.2) rotate(-10deg); opacity: 1; }
+		35%  { transform: translate(-50%, -65%) scale(1.5) rotate(6deg);  opacity: 1; }
+		100% { transform: translate(-50%, -115%) scale(0.9) rotate(12deg); opacity: 0; }
+	}
+
+}
+
+@source "./**/*.{ts,tsx}";
+@source "../index.html";
+
+@layer base {
+	:root {
+		/* --- Shared / Global --- */
+		color-scheme: light dark;
+		--accent: #ffcc01;
+		--accent-contrast: #1a1a1a;
+		--right-now: #9333ea;
+		--content-max: 1200px;
+		--app-px: clamp(12px, 2.6vw, 28px);
+		--radius-sm: 12px;
+		--radius-md: 16px;
+		--radius-lg: 18px;
+		--space-1: 4px;
+		--space-2: 8px;
+		--space-3: 12px;
+		--space-4: 16px;
+		--space-5: 24px;
+		--space-6: 32px;
+
+		/* --- Theme Definition: LIGHT (Default) --- */
+		--bg: #f5f7fa;
+		--surface: #ffffff;
+		--surface-2: #eceff4;
+		--text: #131821;
+		--text-muted: #606a79;
+		--border: #d7dce3;
+		--accent-readable: #765900;
+
+		/* Header Glow (Light) */
+		--header-glow-mix-1: 0%;
+		--header-glow-mix-2: 2%;
+		--header-glow-mix-3: 10%;
+		--header-glow-stop-1: 32%;
+		--header-glow-stop-2: 52%;
+		--header-glow-stop-3: 78%;
+		--header-glow-darken: 16%;
+		--header-noise-opacity: 0.08;
+
+		/* --- Theme Internal: DARK VALUES --- */
+		--dark-bg: #0f131a;
+		--dark-surface: #161d27;
+		--dark-surface-2: #1f2835;
+		--dark-text: #f3f5f8;
+		--dark-text-muted: #96a2b6;
+		--dark-border: #2b3646;
+		--dark-accent-readable: #ffcc01;
+		--dark-glow-1: 10%;
+		--dark-glow-2: 40%;
+		--dark-glow-3: 75%;
+		--dark-glow-stop-1: 15%;
+		--dark-glow-stop-2: 30%;
+		--dark-glow-stop-3: 55%;
+		--dark-mask-stop-1: 25%;
+		--dark-mask-stop-2: 60%;
+		--dark-glow-darken: 0%;
+		--dark-noise: 0.03;
+
+		background-color: var(--bg);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-scheme="light"]) {
+			--bg: var(--dark-bg);
+			--surface: var(--dark-surface);
+			--surface-2: var(--dark-surface-2);
+			--text: var(--dark-text);
+			--text-muted: var(--dark-text-muted);
+			--border: var(--dark-border);
+			--accent-readable: var(--dark-accent-readable);
+
+			--header-glow-mix-1: var(--dark-glow-1);
+			--header-glow-mix-2: var(--dark-glow-2);
+			--header-glow-mix-3: var(--dark-glow-3);
+			--header-glow-stop-1: var(--dark-glow-stop-1);
+			--header-glow-stop-2: var(--dark-glow-stop-2);
+			--header-glow-stop-3: var(--dark-glow-stop-3);
+			--header-mask-stop-1: var(--dark-mask-stop-1);
+			--header-mask-stop-2: var(--dark-mask-stop-2);
+			--header-glow-darken: var(--dark-glow-darken);
+			--header-noise-opacity: var(--dark-noise);
+		}
+	}
+
+	:root[data-scheme="dark"] {
+		color-scheme: dark;
+		--bg: var(--dark-bg);
+		--surface: var(--dark-surface);
+		--surface-2: var(--dark-surface-2);
+		--text: var(--dark-text);
+		--text-muted: var(--dark-text-muted);
+		--border: var(--dark-border);
+		--accent-readable: var(--dark-accent-readable);
+
+		--header-glow-mix-1: var(--dark-glow-1);
+		--header-glow-mix-2: var(--dark-glow-2);
+		--header-glow-mix-3: var(--dark-glow-3);
+		--header-glow-stop-1: var(--dark-glow-stop-1);
+		--header-glow-stop-2: var(--dark-glow-stop-2);
+		--header-glow-stop-3: var(--dark-glow-stop-3);
+		--header-mask-stop-1: var(--dark-mask-stop-1);
+		--header-mask-stop-2: var(--dark-mask-stop-2);
+		--header-glow-darken: var(--dark-glow-darken);
+		--header-noise-opacity: var(--dark-noise);
+	}
+
+	:root[data-scheme="light"] {
+		color-scheme: light;
+	}
+
+	html,
+	body,
+	#app {
+		width: 100%;
+		min-height: 100%;
+	}
+
+	html.has-titlebar,
+	body.has-titlebar {
+		--titlebar-height: 32px;
+		background: transparent !important;
+	}
+
+	#app {
+		height: 100vh;
+		width: 100%;
+		margin: 0;
+		overflow: hidden;
+		background: var(--bg);
+	}
+
+	/* The rounded, outlined window is the frameless desktop window's frame.
+	   These rules used to apply everywhere, which on iOS drew rounded corners
+	   and a hairline border inside the screen's own corners. */
+	body.has-titlebar #app {
+		border-radius: 20px;
+
+		/* Subtle inner highlight to make the glass edge pop */
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		box-sizing: border-box;
+
+		/* Creates containing block so position:fixed children (titlebar, navbar, glow, lightboxes)
+		   are clipped by overflow:hidden + border-radius */
+		transform: translateZ(0);
+	}
+
+	.app-shell {
+		height: 100vh;
+		overflow-y: auto;
+	}
+
+	body.has-titlebar .app-shell {
+		border-radius: 20px;
+	}
+
+	/* Twemoji ahead of the system emoji fonts, so every emoji looks the same. */
+	html[data-emoji-style="twemoji"] body {
+		font-family: "IBM Plex Sans Variable", "IBM Plex Sans", "GrindFlop Twemoji", sans-serif, "Segoe UI Emoji", "Apple Color Emoji";
+	}
+
+	body {
+		margin: 0;
+		background: var(--bg);
+		color: var(--text);
+		--titlebar-height: 0px;
+		/* The system's emoji fonts, then the bundled Twemoji for anything they
+		   cannot draw (see utils/emojiStyle.ts). */
+		font-family: "IBM Plex Sans Variable", "IBM Plex Sans", sans-serif, "Segoe UI Emoji", "Apple Color Emoji", "GrindFlop Twemoji";
+		font-feature-settings:
+			"rlig" 1,
+			"calt" 1;
+		-webkit-font-smoothing: antialiased;
+		text-rendering: optimizeLegibility;
+	}
+
+	* {
+		box-sizing: border-box;
+	}
+
+	a {
+		text-decoration: none;
+		color: inherit;
+	}
+
+	button,
+	input,
+	textarea,
+	select {
+		font: inherit;
+		color: inherit;
+	}
+}
+
+@layer utilities {
+	.h-15 { height: 3.75rem; }
+	.w-15 { width: 3.75rem; }
+	.squircle {
+		border-radius: 32%;
+		mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M 0,50 C 0,6.7 6.7,0 50,0 C 93.3,0 100,6.7 100,50 C 100,93.3 93.3,100 50,100 C 6.7,100 0,93.3 0,50' fill='%23000'/%3E%3C/svg%3E");
+		mask-size: 100% 100%;
+		-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M 0,50 C 0,6.7 6.7,0 50,0 C 93.3,0 100,6.7 100,50 C 100,93.3 93.3,100 50,100 C 6.7,100 0,93.3 0,50' fill='%23000'/%3E%3C/svg%3E");
+		-webkit-mask-size: 100% 100%;
+		overflow: hidden;
+	}
+}
+
+@layer components {
+    /* Chat */
+	.chat-reaction-pill {
+		will-change: transform;
+		transition:
+			transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+			background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+	}
+
+	.chat-reaction-pill--burst {
+		animation: fire-pill-pop 420ms cubic-bezier(0.16, 1, 0.3, 1);
+		background: color-mix(in srgb, var(--accent) 20%, transparent);
+	}
+
+	.chat-reaction-flame {
+		transform-origin: 50% 85%;
+		animation: fire-flame-idle 3s ease-in-out infinite;
+		cursor: pointer;
+	}
+
+	.chat-reaction-flame--hoverable {
+		opacity: 0;
+	}
+
+	.group\/bubble:hover .chat-reaction-flame--hoverable {
+		opacity: 0.25;
+	}
+
+	.chat-reaction-flame--burst {
+		animation: fire-flame-flicker 520ms cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	.chat-reaction-flame--burst::after {
+		content: "";
+		position: absolute;
+		inset: -5px;
+		border-radius: 9999px;
+		border: 1px solid color-mix(in srgb, var(--accent) 62%, transparent);
+		opacity: 0;
+		animation: fire-ring 520ms cubic-bezier(0.16, 1, 0.3, 1);
+		pointer-events: none;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.chat-reaction-pill,
+		.chat-reaction-pill--burst,
+		.chat-reaction-flame,
+		.chat-reaction-flame--burst,
+		.chat-reaction-flame--burst::after {
+			animation: none !important;
+			transition: none !important;
+		}
+	}
+
+    /* Taps */
+	.tap-btn-base {
+		touch-action: none;
+		user-select: none;
+		-webkit-user-select: none;
+		transition:
+			border-color 0.2s ease,
+			transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+	}
+
+	.tap-btn-outer-halo {
+		background: radial-gradient(circle, var(--halo-color) 0%, rgba(2, 6, 23, 0) 70%);
+		transition: background 0.4s ease;
+	}
+
+	.tap-btn-emoji-container {
+    		display: inline-block;
+    		transition:
+    			transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    			filter 0.3s ease,
+    			text-shadow 0.3s ease,
+    			opacity 0.2s ease;
+    		will-change: transform, filter;
+    	}
+
+    .tap-btn-emoji-hidden {
+        transform: translateY(30px) scale(0.3) rotate(15deg) !important;
+        opacity: 0 !important;
+        transition: none !important;
+    }
+
+    .tap-btn-emoji-active {
+        text-shadow:
+            0 0 15px var(--halo-color),
+            0 0 30px var(--halo-color);
+        filter: grayscale(0) brightness(1.2);
+        will-change: transform, filter;
+        transition:
+            filter 0.3s ease,
+            text-shadow 0.3s ease,
+            transform 0.2s ease;
+    }
+
+    .tap-btn-ripple {
+        border-color: var(--halo-color);
+        pointer-events: none;
+        position: absolute;
+        inset: 0;
+        border-radius: 9999px;
+        opacity: 0;
+        z-index: 5;
+        border-style: solid;
+    }
+
+	.tab-menu {
+		background: radial-gradient(circle at center, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0) 80%);
+		backdrop-filter: blur(12px);
+		transform: rotate(-15deg) translateY(20px) translateX(-50%);
+		transform-origin: left bottom;
+		opacity: 0;
+		pointer-events: none;
+		transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+		padding: 2.5rem 3rem;
+	}
+
+	.tab-menu.active {
+		opacity: 1;
+		transform: rotate(-10deg) translateY(0) translateX(-50%);
+		pointer-events: auto;
+	}
+
+	.tab-menu-slide {
+		opacity: 0;
+		pointer-events: none;
+		transform: translateX(12px) translateY(-50%);
+		transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+	}
+
+	.tab-menu-slide.active {
+		opacity: 1;
+		pointer-events: auto;
+		transform: translateX(0) translateY(-50%);
+	}
+
+
+	.tab-menu-emoji {
+		transition:
+			transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+			filter 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+		will-change: transform, filter;
+	}
+
+	.tab-menu-emoji.highlight {
+		transform: scale(1.8) translateY(-10px) translateZ(0);
+		/* Base shadow for mobile/small screens (Android WebView is very sensitive to blur radii) */
+		filter: brightness(1.2) drop-shadow(0 0 10px var(--halo-color));
+		will-change: transform, filter;
+	}
+
+	@media (min-width: 1024px) {
+		.tab-menu-emoji.highlight {
+			/* Larger shadow for desktop where rendering is more conservative */
+			filter: brightness(1.2) drop-shadow(0 0 45px var(--halo-color));
+		}
+	}
+
+	.app-shell {
+		position: relative;
+		min-height: 100dvh;
+		background: var(--bg);
+		color: var(--text);
+		z-index: 0;
+		transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+	}
+
+	/* Separate layers for the glow effects to avoid using color-mix within gradients (Webview compatibility).
+	   Using position: fixed ensures the glow stays locked to the viewport during scrolling, maintaining
+	   consistent intensity and positioning regardless of page length. This ensures a seamless visual
+	   transition between short loading states and long, scrollable content pages. */
+
+	.app-shell::before {
+		content: "";
+		position: fixed;
+		inset: 0;
+		background: radial-gradient(
+			circle at 14% -10% in oklab,
+			var(--app-accent-gradient, var(--accent)) 0%,
+			color-mix(in oklab, var(--app-accent-gradient, var(--accent)), transparent 55%) 14%,
+			color-mix(in oklab, var(--app-accent-gradient, var(--accent)), transparent 88%) 26%,
+			transparent 40%
+		);
+		opacity: 0.12;
+		pointer-events: none;
+		z-index: -1;
+		transition: background 0.5s ease;
+	}
+
+	.app-shell::after {
+		content: "";
+		position: fixed;
+		inset: 0;
+		background: radial-gradient(
+			circle at 90% -20% in oklab,
+			var(--surface-2) 0%,
+			color-mix(in oklab, var(--surface-2), transparent 60%) 16%,
+			color-mix(in oklab, var(--surface-2), transparent 92%) 32%,
+			transparent 46%
+		);
+		opacity: 0.46;
+		pointer-events: none;
+		z-index: -1;
+	}
+
+
+	.app-screen {
+		min-height: 100dvh;
+		width: min(100%, var(--content-max));
+		margin-inline: auto;
+		/* Uses --app-px for consistent horizontal alignment while allowing overrides (like edge-to-edge grids) */
+		padding: calc(env(safe-area-inset-top, 0px) + var(--titlebar-height) + clamp(14px, 2.2vw, 28px))
+			var(--app-px)
+			calc(env(safe-area-inset-bottom, 0px) + clamp(92px, 10vw, 114px));
+	}
+
+	@media (min-width: 1024px) {
+		.app-screen {
+			padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+		}
+	}
+
+
+	/* Standard card with borders, shadows, and rounded corners used for modals and focused UI elements */
+	.surface-card {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 18px;
+		box-shadow: 0 16px 34px rgba(0, 0, 0, 0.17);
+		box-shadow:
+			0 16px 34px color-mix(in srgb, #000 17%, transparent),
+			0 1px 0 color-mix(in srgb, var(--surface) 74%, transparent) inset;
+	}
+
+	/* The search field above the settings list. It shares the cards' surface
+		 and shadow so it reads as one of them, and takes the accent colour while
+		 it is being typed in, like the other search fields. */
+	.settings-search-bar {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		box-shadow:
+			0 10px 24px color-mix(in srgb, #000 12%, transparent),
+			0 1px 0 color-mix(in srgb, var(--surface) 74%, transparent) inset;
+		transition: border-color 140ms ease;
+	}
+	.settings-search-bar:focus-within {
+		border-color: var(--accent);
+	}
+
+	/* The setting a search result jumped to, lit for a moment (see
+		 useSettingsJump, which holds the same length). A tint laid over the row
+		 as an inset shadow, so a card keeps its own background, and a ring drawn
+		 inside its edge, where a card that clips its rows cannot cut it off. */
+	.settings-jump-highlight {
+		outline: 2px solid transparent;
+		outline-offset: -2px;
+		scroll-margin-top: 5rem;
+		animation: settings-jump-highlight 1.6s ease-out both;
+	}
+	@keyframes settings-jump-highlight {
+		0%,
+		30% {
+			box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--accent) 16%, transparent);
+			outline-color: color-mix(in srgb, var(--accent) 80%, transparent);
+		}
+		100% {
+			box-shadow: inset 0 0 0 999px transparent;
+			outline-color: transparent;
+		}
+	}
+
+	/* Specialized card for the browse grid. We only inherit the surface color
+	   to keep the grid layout clean without the bulky shadows or borders of standard cards. */
+    .surface-card-grid {
+        background: var(--surface);
+    }
+
+	.input-field {
+		width: 100%;
+		min-height: 44px;
+		padding: 12px 14px;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		color: var(--text);
+		transition: border-color 140ms ease;
+	}
+
+	.input-field:focus {
+		outline: 2px solid rgba(255, 204, 1, 0.58);
+		outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+		outline-offset: 1px;
+	}
+
+	select.input-field {
+		appearance: none;
+		-webkit-appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23606a79' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 12px center;
+		background-size: 16px 16px;
+		padding-right: 40px;
+		cursor: pointer;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		select.input-field {
+			background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2396a2b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+		}
+	}
+
+	.dark select.input-field {
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2396a2b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+	}
+
+	.input-field-compact {
+		min-height: 36px;
+		padding: 4px 10px;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		color: var(--text);
+		font-size: 0.875rem;
+		transition: border-color 140ms ease;
+	}
+
+	.input-field-compact:focus {
+		outline: 2px solid color-mix(in srgb, var(--accent) 58%, transparent);
+		outline-offset: 1px;
+	}
+
+	select.input-field-compact {
+		appearance: none;
+		-webkit-appearance: none;
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23606a79' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+		background-repeat: no-repeat;
+		background-position: right 8px center;
+		background-size: 14px 14px;
+		padding-right: 28px;
+		cursor: pointer;
+	}
+
+	@media (prefers-color-scheme: dark) {
+		select.input-field-compact {
+			background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2396a2b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+		}
+	}
+
+	.dark select.input-field-compact {
+		background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2396a2b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+	}
+
+	.btn-accent {
+		background: var(--accent);
+		color: var(--accent-contrast);
+		border: 0;
+		min-height: 44px;
+		padding: 10px 14px;
+		border-radius: var(--radius-sm);
+		font-weight: 700;
+		transition:
+			transform 160ms ease,
+			filter 160ms ease;
+	}
+
+	.btn-accent:hover:not(:disabled) {
+		filter: brightness(1.03);
+	}
+
+	.btn-accent:active:not(:disabled) {
+		transform: translateY(1px);
+	}
+
+	.btn-accent:disabled {
+		opacity: 0.5;
+	}
+
+	.app-title {
+		font-size: clamp(1.6rem, 4.2vw, 2.05rem);
+		line-height: 1.1;
+		font-weight: 760;
+		letter-spacing: -0.02em;
+	}
+
+	.app-subtitle {
+		font-size: 0.98rem;
+		line-height: 1.5;
+		color: var(--text-muted);
+	}
+
+	.glass-pill {
+		@apply rounded-full border shadow-2xl backdrop-blur-xl transition-all;
+		background-color: color-mix(in srgb, var(--pill-color, var(--accent)), transparent 88%);
+		border-color: color-mix(in srgb, var(--pill-color, var(--accent)), transparent 40%);
+		border-width: 1px;
+	}
+
+	.glass-pill.neutral {
+		background-color: rgba(255, 255, 255, 0.1);
+		border-color: rgba(0, 0, 0, 0.08);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:root:not([data-scheme="light"]) .glass-pill.neutral {
+			border-color: rgba(255, 255, 255, 0.1);
+		}
+	}
+
+	.no-touch-callout {
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
+	}
+
+	/*
+	 * Selection is off app-wide (layout.css) so dragging scrolls instead of
+	 * highlighting. The "select text to ban it" setting puts it back on for
+	 * exactly the text worth banning a word from — a message bubble, a bio, a
+	 * Right Now post — and nothing else, so the rest of the app still drags.
+	 */
+	.ban-selectable {
+		-webkit-user-select: text;
+		user-select: text;
+		cursor: text;
+		/*
+		 * iOS would otherwise answer a long press with its own Copy/Look Up
+		 * bar on top of the app's message actions sheet. Selection by drag
+		 * still works; only the duplicate native menu is suppressed.
+		 */
+		-webkit-touch-callout: none;
+	}
+
+	.right-now-map-tooltip {
+		background: transparent !important;
+		border: 0 !important;
+		box-shadow: none !important;
+		padding: 0 !important;
+	}
+
+	.right-now-map-tooltip::before {
+		display: none !important;
+	}
+
+	.right-now-map-tooltip,
+	.right-now-map-tooltip * {
+		box-sizing: border-box;
+	}
+
+	.right-now-map-tooltip__avatar {
+		position: relative;
+		width: 52px;
+		height: 52px;
+		border-radius: 9999px;
+		overflow: hidden;
+		border: 3px solid rgba(255, 255, 255, 0.96);
+		background: var(--surface-2);
+		box-shadow: 0 8px 18px rgba(0, 0, 0, 0.24);
+	}
+
+	.right-now-map-tooltip__avatar.is-selected {
+		border-color: var(--accent);
+		box-shadow: 0 12px 24px rgba(0, 0, 0, 0.28);
+	}
+
+	.right-now-map-tooltip__image {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.right-now-map-tooltip__badge {
+		position: absolute;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 9999px;
+		border: 2px solid #0b0b0c;
+		box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+	}
+
+	.right-now-map-tooltip__badge--hosting {
+		top: -2px;
+		right: -2px;
+		width: 18px;
+		height: 18px;
+		background: #ffcc01;
+	}
+
+	.right-now-map-tooltip__badge--online {
+		right: 1px;
+		bottom: 1px;
+		width: 14px;
+		height: 14px;
+		background: #2bd66f;
+	}
+
+    /* --- HIDE ALL SCROLLBARS GLOBALLY --- */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+
+    * {
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE and Edge */
+    }
+}
+
+@keyframes tap-fly-center {
+  0%   { opacity: 1; transform: translate(calc(-50% + 50vw - 110px), calc(-50% + 50vh - 80px)) scale(0.9); }
+  55%  { opacity: 1;    transform: translate(-50%, -50%) scale(3.5); }
+  70%  { opacity: 0.5; }
+  100% { opacity: 0;    transform: translate(-50%, -50%) scale(14); }
+}
+.animate-tap-fly-center {
+  animation: tap-fly-center 1.3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  pointer-events: none;
+  font-size: 3rem;
+  line-height: 1;
+}
+
+@keyframes particle-rise {
+  0%   { opacity: 1;   transform: translate(0px, 0px) scale(1); }
+  25%  { opacity: 0.6; transform: translate(calc(var(--dx)*0.3), calc(var(--dy)*0.3)) scale(1.4); }
+  55%  { opacity: 1;   transform: translate(calc(var(--dx)*0.65), calc(var(--dy)*0.65)) scale(0.8); }
+  80%  { opacity: 0.3; transform: translate(calc(var(--dx)*0.88), calc(var(--dy)*0.88)) scale(0.4); }
+  92%  { opacity: 0;   transform: translate(calc(var(--dx)*0.97), calc(var(--dy)*0.97)) scale(0.15); }
+  100% { opacity: 0;   transform: translate(var(--dx), var(--dy)) scale(0.1); }
+}
+.animate-particle-rise {
+  animation: particle-rise var(--dur, 0.65s) cubic-bezier(0.4, 0, 0.8, 1) forwards;
+  animation-delay: var(--delay, 0s);
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+@keyframes emoji-particle-rise {
+  0%   { opacity: 0; transform: translate(0px, 0px) scale(0.5); }
+  15%  { opacity: 1; transform: translate(calc(var(--dx)*0.1), calc(var(--dy)*0.1)) scale(1.1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.7); }
+}
+.animate-emoji-particle-rise {
+  animation: emoji-particle-rise var(--dur, 0.8s) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation-delay: var(--delay, 0s);
+  position: fixed;
+  pointer-events: none;
+}
+
+@keyframes trash-bounce {
+  0%   { transform: translateY(0); }
+  40%  { transform: translateY(-6px); }
+  70%  { transform: translateY(2px); }
+  100% { transform: translateY(0); }
+}
+.animate-trash-bounce {
+  animation: trash-bounce 0.3s ease-out forwards;
+}
+
+/* --- MESSAGE POP-UP/INCOMING ANIMATIONS --- */
+@keyframes msg-pop-mine {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) translateX(6px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateX(0) scale(1);
+  }
+}
+
+@keyframes msg-pop-other {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) translateX(-6px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) translateX(0) scale(1);
+  }
+}
+
+.animate-message-pop-mine {
+  animation: msg-pop-mine 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  will-change: transform, opacity;
+}
+
+.animate-message-pop-other {
+  animation: msg-pop-other 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  will-change: transform, opacity;
+}
+
+/* --- TITLE BAR PADDING OFFSETS FOR FULL-SCREEN PANELS --- */
+.profile-modal-header {
+  padding-top: calc(var(--titlebar-height, 0px) + env(safe-area-inset-top, 0px) + 10px);
+}
+@media (min-width: 640px) {
+  .profile-modal-header {
+    padding-top: calc(var(--titlebar-height, 0px) + env(safe-area-inset-top, 0px) + 12px);
+  }
+}
+
+.browse-location-container {
+  padding-top: calc(var(--titlebar-height, 0px) + env(safe-area-inset-top, 0px) + 16px);
+}
+
+.right-now-filters-header {
+  padding-top: calc(var(--titlebar-height, 0px) + env(safe-area-inset-top, 0px) + 1rem);
+}
+
+.right-now-post-header {
+  padding-top: calc(var(--titlebar-height, 0px) + env(safe-area-inset-top, 0px) + 1rem);
+}
+
+.profile-content-container {
+  padding-top: calc(var(--titlebar-height, 0px) + 16px);
+}
+
+.app-page-container {
+	transition: filter 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.profile-modal-open .app-page-container {
+	filter: blur(24px);
+}
+
+body.has-titlebar dialog::backdrop {
+	background-color: transparent !important;
+	backdrop-filter: none !important;
+}
+
+/* Phones. On an iPhone the reveal effect made profiles slow to appear and
+   stutter in, and the grid filled almost instantly with it off. So phones get a
+   lighter reveal — a short fade and lift, with no blur or scale to rasterize —
+   and glass pills change state at once instead of re-blending their backdrop
+   blur through every frame of a colour transition. */
+@keyframes reveal-row-lite {
+	from {
+		opacity: 0;
+		transform: translateY(12px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+@media (hover: none) and (pointer: coarse) {
+	:root {
+		--animate-reveal-row: reveal-row-lite 0.28s ease-out backwards;
+	}
+
+	.glass-pill {
+		transition: none;
+	}
+}
+
+/* ÔöÇÔöÇ Leaflet dark mode ÔöÇÔöÇ */
+
+/* Invert only the map tiles ÔÇö pin marker and controls are unaffected */
+:root[data-scheme="dark"] .leaflet-tile-pane {
+  filter: invert(0.88) hue-rotate(180deg) saturate(0.65) brightness(0.9);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme="light"]) .leaflet-tile-pane {
+    filter: invert(0.88) hue-rotate(180deg) saturate(0.65) brightness(0.9);
+  }
+}
+
+:root[data-scheme="dark"] .leaflet-bar a,
+:root[data-scheme="dark"] .leaflet-bar a:hover {
+  background-color: var(--surface-2);
+  color: var(--text);
+  border-bottom-color: var(--border);
+}
+:root[data-scheme="dark"] .leaflet-bar a:hover {
+  background-color: var(--surface-3, var(--surface-2));
+}
+:root[data-scheme="dark"] .leaflet-bar a.leaflet-disabled {
+  background-color: var(--surface);
+  color: var(--text-muted);
+}
+:root[data-scheme="dark"] .leaflet-bar {
+  border-color: var(--border);
+  box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+}
+:root[data-scheme="dark"] .leaflet-control-attribution {
+  background-color: color-mix(in srgb, var(--bg) 80%, transparent);
+  color: var(--text-muted);
+}
+:root[data-scheme="dark"] .leaflet-control-attribution a {
+  color: var(--text-muted);
+}
+:root[data-scheme="dark"] .leaflet-popup-content-wrapper,
+:root[data-scheme="dark"] .leaflet-popup-tip {
+  background-color: var(--surface-2);
+  color: var(--text);
+  box-shadow: 0 3px 14px rgba(0,0,0,0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme="light"]) .leaflet-bar a,
+  :root:not([data-scheme="light"]) .leaflet-bar a:hover {
+    background-color: var(--surface-2);
+    color: var(--text);
+    border-bottom-color: var(--border);
+  }
+  :root:not([data-scheme="light"]) .leaflet-bar a:hover {
+    background-color: var(--surface-3, var(--surface-2));
+  }
+  :root:not([data-scheme="light"]) .leaflet-bar a.leaflet-disabled {
+    background-color: var(--surface);
+    color: var(--text-muted);
+  }
+  :root:not([data-scheme="light"]) .leaflet-bar {
+    border-color: var(--border);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.5);
+  }
+  :root:not([data-scheme="light"]) .leaflet-control-attribution {
+    background-color: color-mix(in srgb, var(--bg) 80%, transparent);
+    color: var(--text-muted);
+  }
+  :root:not([data-scheme="light"]) .leaflet-control-attribution a {
+    color: var(--text-muted);
+  }
+  :root:not([data-scheme="light"]) .leaflet-popup-content-wrapper,
+  :root:not([data-scheme="light"]) .leaflet-popup-tip {
+    background-color: var(--surface-2);
+    color: var(--text);
+    box-shadow: 0 3px 14px rgba(0,0,0,0.5);
+  }
+}
+
+em-emoji-picker {
+    --em-rgb-color: var(--rgb-accent) !important;
+}
+
+.liquid-glass-panel {
+    background-color: rgba(15, 17, 21, 0.25) !important;
+    background: color-mix(in srgb, var(--surface) 25%, transparent) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 12px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+.liquid-glass-bubble-mine {
+    background-color: rgba(255, 204, 1, 0.2) !important;
+    background: color-mix(in srgb, var(--accent) 25%, transparent) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 4px 12px color-mix(in srgb, var(--accent) 15%, transparent) !important;
+}
+
+.liquid-glass-bubble-other {
+    background-color: rgba(15, 17, 21, 0.25) !important;
+    background: color-mix(in srgb, var(--surface-2) 25%, transparent) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.glass-btn-accent {
+    background-color: rgba(255, 204, 1, 0.08) !important;
+    background: color-mix(in srgb, var(--accent) 8%, transparent) !important;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent) !important;
+    color: var(--accent) !important;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+.glass-btn-pink {
+    background-color: rgba(236, 72, 153, 0.08) !important;
+    background: color-mix(in srgb, rgb(236, 72, 153) 8%, transparent) !important;
+    border: 1px solid rgba(236, 72, 153, 0.3) !important;
+    color: rgb(244, 114, 182) !important;
+    box-shadow: 0 0 12px rgba(236, 72, 153, 0.1) !important;
+}
+
+.glass-btn-red {
+    background-color: rgba(239, 68, 68, 0.08) !important;
+    background: color-mix(in srgb, rgb(239, 68, 68) 8%, transparent) !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    color: rgb(248, 113, 113) !important;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.1) !important;
+}
+
+.glass-btn-muted {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    color: var(--text-muted) !important;
+    transition: all 0.2s ease !important;
+}
+.glass-btn-muted:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
+    color: var(--text) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.glass-dropdown-panel {
+    background-color: rgba(15, 17, 21, 0.75) !important;
+    background: color-mix(in srgb, var(--surface) 75%, transparent) !important;
+    backdrop-filter: blur(45px) !important;
+    -webkit-backdrop-filter: blur(45px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 12px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Shared album viewer: the window rises into place, its tiles follow in turn.
+   Fill mode backwards, not both, so nothing keeps a transform (and its own
+   compositing layer) once the animation is over. */
+@keyframes album-panel-in {
+    from { opacity: 0; transform: translateY(24px) scale(0.985); }
+    to { opacity: 1; transform: none; }
+}
+@keyframes album-panel-out {
+    from { opacity: 1; transform: none; }
+    to { opacity: 0; transform: translateY(24px) scale(0.985); }
+}
+@keyframes album-tile-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to { opacity: 1; transform: none; }
+}
+.album-panel-in {
+    animation: album-panel-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.album-panel-out {
+    animation: album-panel-out 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.album-tile-in {
+    animation: album-tile-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: var(--tile-delay, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+    .album-panel-in,
+    .album-tile-in {
+        animation: none;
+    }
+    .album-panel-out {
+        animation-duration: 0.01s;
+    }
+}
+
+/*
+ * The sign-in screen, the first-run steps and the what's-new screen.
+ * These rules were lost on 2026-07-03 and the three screens have been
+ * unstyled since: stretched over the window on a desktop, and in the page
+ * flow rather than over it.
+ */
+/* Full-screen on mobile, centered card on desktop */
+.fs-card-outer {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+.fs-card-inner {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fs-card-inner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 220px;
+  background: linear-gradient(
+    to bottom,
+    oklch(0 0 0 / 0.26) 0%,
+    oklch(0 0 0 / 0.14) 30%,
+    oklch(0 0 0 / 0.04) 65%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+.top-dots-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-glow {
+  display: block;
+}
+
+@media (min-width: 640px) {
+  .fs-card-inner::before {
+    display: none;
+  }
+  .auth-glow {
+    display: none;
+  }
+  .fs-card-outer {
+    background: transparent;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .fs-card-outer.fs-card-overlay {
+    background: oklch(0 0 0 / 0.5);
+  }
+  .fs-card-inner {
+    flex: none;
+    width: 100%;
+    max-width: 26rem;
+    max-height: 90vh;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: 0 20px 40px -8px oklch(0 0 0 / 0.18);
+  }
+  .fs-card-inner.fs-card-lg {
+    max-width: 30rem;
+    min-height: 580px;
+  }
+  .fs-card-inner .top-dots-wrap {
+    padding-bottom: 3.5rem;
+  }
+}

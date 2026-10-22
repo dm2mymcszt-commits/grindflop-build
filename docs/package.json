@@ -1,0 +1,22 @@
+{
+	"name": "free-grind-docs",
+	"private": true,
+	"license": "MIT",
+	"type": "module",
+	"module": "index.ts",
+	"scripts": {
+		"prestart": "bun run --cwd .. sync",
+		"prebuild": "bun run --cwd .. sync",
+		"prepreview": "bun run --cwd .. sync",
+		"build": "vitepress build",
+		"preview": "vitepress preview",
+		"start": "vitepress dev"
+	},
+	"devDependencies": {
+		"@types/bun": "latest",
+		"vitepress": "^2.0.0-alpha.17"
+	},
+	"peerDependencies": {
+		"typescript": "^6"
+	}
+}
