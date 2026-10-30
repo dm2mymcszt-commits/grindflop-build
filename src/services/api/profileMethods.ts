@@ -1,0 +1,548 @@
+import {
+	browseCardSchema,
+	browseProfileSchema,
+	cascadeResponseSchema,
+	profileDetailResponseSchema,
+	type BrowseCard,
+	type ProfileDetail,
+} from "../../types/grid";
+import type {
+	ManagedGender,
+	ManagedPronoun,
+	ProfileImageUploadResult,
+} from "../../types/api-functions";
+import type { RestFetcher } from "../../types/chat-service";
+import type { VisitingMode } from "../../types/visiting";
+import { isVisitingMode } from "../../types/visiting";
+import { travelPlansResponseSchema, type TravelPlan, type TravelPlanPayload } from "../../types/travel";
+import { homeLocationSchema, type HomeLocation } from "../../types/home-location";
+import { ApiFunctionError, assertSuccess, parseJsonSafe } from "../apiHelpers";
+import { getIncognitoMode, isRecordProfileViewsEnabled } from "../../utils/privacy";
+import { appLog } from "../../utils/logger";
+import {
+	blockListOwner,
+	rememberAllUnblocked,
+	rememberBlockChange,
+	rememberFullBlockList,
+} from "../blockListSnapshot";
+import {
+	keepProfileCopy,
+	profileCopyOwner,
+	rememberProfileAnswer,
+} from "../profileCopyStore";
+import { favoriteSeenInProfileAnswer } from "../favoriteSync";
+import { presenceSeenInProfileAnswer } from "../chatPresenceSync";
+
+export function createProfileMethods(fetchRest: RestFetcher, t: (key: string, options?: any) => string) {
+	return {
+		async getBlockedProfileIds(): Promise<string[]> {
+			// Taken before the request, so an answer arriving after an account
+			// switch can't be saved as the other account's list.
+			const owner = blockListOwner();
+			const requestedAt = Date.now();
+			const response = await fetchRest("/v3.1/me/blocks");
+			await assertSuccess(response, t("profile_details.block_failed"));
+			const payload = await parseJsonSafe(response);
+
+			if (typeof payload !== "object" || payload === null) {
+				throw new ApiFunctionError(
+					t("profile_details.block_failed"),
+					response.status,
+					payload,
+				);
+			}
+
+			const blocking = (payload as { blocking?: unknown }).blocking;
+			if (!Array.isArray(blocking)) {
+				// Not saved: an odd answer mustn't wipe the copy on this device.
+				return [];
+			}
+
+			const profileIds = blocking
+				.map((entry) => {
+					if (typeof entry !== "object" || entry === null) {
+						return null;
+					}
+					const profileId = (entry as { profileId?: unknown }).profileId;
+					if (typeof profileId === "string" || typeof profileId === "number") {
+						return String(profileId);
+					}
+					return null;
+				})
+				.filter((profileId): profileId is string => profileId !== null);
+			rememberFullBlockList(owner, profileIds, requestedAt);
+			return profileIds;
+		},
+
+		async blockProfile(profileId: string): Promise<{ ok: true }> {
+			const owner = blockListOwner();
+			const response = await fetchRest(
+				`/v3/me/blocks/${encodeURIComponent(profileId)}`,
+				{ method: "POST" },
+			);
+			await assertSuccess(response, t("profile_details.block_failed"));
+			rememberBlockChange(owner, profileId, true);
+			// Their profile can't be read from here on; the saved copy stays.
+			keepProfileCopy(owner, profileId);
+			return { ok: true };
+		},
+
+		async unblockProfile(profileId: string): Promise<{ ok: true }> {
+			const owner = blockListOwner();
+			const response = await fetchRest(
+				`/v3/me/blocks/${encodeURIComponent(profileId)}`,
+				{ method: "DELETE" },
+			);
+			await assertSuccess(response, t("profile_details.unblock_failed"));
+			rememberBlockChange(owner, profileId, false);
+			return { ok: true };
+		},
+
+		async unblockAllProfiles(): Promise<{ ok: true }> {
+			const owner = blockListOwner();
+			const requestedAt = Date.now();
+			const response = await fetchRest("/v3/me/blocks", { method: "DELETE" });
+			await assertSuccess(response, t("settings_blocked.unblock_all_failed", { defaultValue: "Failed to unblock all profiles." }));
+			rememberAllUnblocked(owner, requestedAt);
+			return { ok: true };
+		},
+
+		async getManagedGenders(): Promise<ManagedGender[]> {
+			const response = await fetchRest("/public/v2/genders");
+			await assertSuccess(response, t("api.errors.load_genders"));
+			const payload = await parseJsonSafe(response);
+			if (!Array.isArray(payload)) {
+				throw new ApiFunctionError(t("api.errors.invalid_genders_response"), response.status, payload);
+			}
+			return payload
+				.map((entry) => {
+					if (
+						typeof entry === "object" &&
+						entry !== null &&
+						typeof (entry as { genderId?: unknown }).genderId === "number" &&
+						typeof (entry as { gender?: unknown }).gender === "string"
+					) {
+						const displayGroup = (entry as { displayGroup?: unknown }).displayGroup;
+						const sortFilter = (entry as { sortFilter?: unknown }).sortFilter;
+						return {
+							genderId: (entry as { genderId: number }).genderId,
+							gender: (entry as { gender: string }).gender,
+							displayGroup: typeof displayGroup === "number" ? displayGroup : 0,
+							sortFilter: typeof sortFilter === "number" ? sortFilter : null,
+						};
+					}
+					return null;
+				})
+				.filter((entry): entry is ManagedGender => entry !== null);
+		},
+
+		async getManagedPronouns(): Promise<ManagedPronoun[]> {
+			const response = await fetchRest("/v1/pronouns");
+			await assertSuccess(response, t("api.errors.load_pronouns"));
+			const payload = await parseJsonSafe(response);
+			if (!Array.isArray(payload)) {
+				throw new ApiFunctionError(t("api.errors.invalid_pronouns_response"), response.status, payload);
+			}
+			return payload
+				.map((entry) => {
+					if (
+						typeof entry === "object" &&
+						entry !== null &&
+						typeof (entry as { pronounId?: unknown }).pronounId === "number" &&
+						typeof (entry as { pronoun?: unknown }).pronoun === "string"
+					) {
+						return {
+							pronounId: (entry as { pronounId: number }).pronounId,
+							pronoun: (entry as { pronoun: string }).pronoun,
+						};
+					}
+					return null;
+				})
+				.filter((entry): entry is ManagedPronoun => entry !== null);
+		},
+
+		async getBrowseProfileMedia(profileId: number | string): Promise<{
+			profileImageMediaHash: string | null;
+			medias: Array<{ mediaHash?: string }>;
+		}> {
+			const response = await fetchRest(`/v7/profiles/${profileId}`);
+			await assertSuccess(response, t("api.errors.load_profile_media"));
+			const parsed = browseProfileSchema.parse(await parseJsonSafe(response));
+			return {
+				profileImageMediaHash: parsed.profiles[0]?.profileImageMediaHash ?? null,
+				medias: parsed.profiles[0]?.medias ?? [],
+			};
+		},
+
+		async getBrowseCards(params: {
+			geohash: string;
+			/** Browse a different area via cascade's exploreGeoHash instead of nearbyGeoHash — geohash (your real/reported location) stays untouched either way, see the exploreGeoHash/nearbyGeoHash mutual-exclusion note below. */
+			exploreGeohash?: string;
+			page?: number;
+			filters?: {
+				onlineOnly?: boolean;
+				photoOnly?: boolean;
+				faceOnly?: boolean;
+				hasAlbum?: boolean;
+				notRecentlyChatted?: boolean;
+				fresh?: boolean;
+				rightNow?: boolean;
+				favorites?: boolean;
+				shuffle?: boolean;
+				hot?: boolean;
+				ageMin?: number;
+				ageMax?: number;
+				heightCmMin?: number;
+				heightCmMax?: number;
+				weightGramsMin?: number;
+				weightGramsMax?: number;
+				tribes?: string;
+				lookingFor?: string;
+				relationshipStatuses?: string;
+				bodyTypes?: string;
+				sexualPositions?: string;
+				meetAt?: string;
+				nsfwPics?: string;
+				tags?: string;
+			};
+		}): Promise<{ cards: BrowseCard[]; nextPage: number | null }> {
+			// Cascade rejects nearbyGeoHash + exploreGeoHash together with
+			// CAS-4001 — exploring apparently relies on the server's own
+			// last-known (real) location for "nearby" once exploreGeoHash is
+			// present, so send only one or the other, never both.
+			const queryParams = new URLSearchParams(
+				params.exploreGeohash
+					? { exploreGeoHash: params.exploreGeohash }
+					: { nearbyGeoHash: params.geohash },
+			);
+
+			if (typeof params.page === "number") {
+				queryParams.set("pageNumber", String(params.page));
+			}
+
+			if (params.filters?.onlineOnly) queryParams.set("onlineOnly", "true");
+			if (params.filters?.photoOnly) queryParams.set("photoOnly", "true");
+			if (params.filters?.faceOnly) queryParams.set("faceOnly", "true");
+			if (params.filters?.hasAlbum) queryParams.set("hasAlbum", "true");
+			if (params.filters?.notRecentlyChatted)
+				queryParams.set("notRecentlyChatted", "true");
+			if (params.filters?.fresh) queryParams.set("fresh", "true");
+			if (params.filters?.rightNow) queryParams.set("rightNow", "true");
+			if (params.filters?.favorites) queryParams.set("favorites", "true");
+			if (params.filters?.shuffle) queryParams.set("shuffle", "true");
+			if (params.filters?.hot) queryParams.set("hot", "true");
+			if (typeof params.filters?.ageMin === "number") {
+				queryParams.set("ageMin", String(params.filters.ageMin));
+			}
+			if (typeof params.filters?.ageMax === "number") {
+				queryParams.set("ageMax", String(params.filters.ageMax));
+			}
+			if (typeof params.filters?.heightCmMin === "number") {
+				queryParams.set("heightCmMin", String(params.filters.heightCmMin));
+			}
+			if (typeof params.filters?.heightCmMax === "number") {
+				queryParams.set("heightCmMax", String(params.filters.heightCmMax));
+			}
+			if (typeof params.filters?.weightGramsMin === "number") {
+				queryParams.set("weightGramsMin", String(params.filters.weightGramsMin));
+			}
+			if (typeof params.filters?.weightGramsMax === "number") {
+				queryParams.set("weightGramsMax", String(params.filters.weightGramsMax));
+			}
+			if (params.filters?.tribes) queryParams.set("tribes", params.filters.tribes);
+			if (params.filters?.lookingFor)
+				queryParams.set("lookingFor", params.filters.lookingFor);
+			if (params.filters?.relationshipStatuses)
+				queryParams.set("relationshipStatuses", params.filters.relationshipStatuses);
+			if (params.filters?.bodyTypes)
+				queryParams.set("bodyTypes", params.filters.bodyTypes);
+			if (params.filters?.sexualPositions)
+				queryParams.set("sexualPositions", params.filters.sexualPositions);
+			if (params.filters?.meetAt) queryParams.set("meetAt", params.filters.meetAt);
+			if (params.filters?.nsfwPics)
+				queryParams.set("nsfwPics", params.filters.nsfwPics);
+			if (params.filters?.tags) queryParams.set("tags", params.filters.tags);
+
+			const url = `/v4/cascade?${queryParams.toString()}`;
+			const response = await fetchRest(url);
+			await assertSuccess(response, t("api.errors.load_browse_profiles"));
+			const parsed = cascadeResponseSchema.parse(await parseJsonSafe(response));
+			const cards: BrowseCard[] = [];
+			for (const item of parsed.items) {
+				if (item.type !== "full_profile_v1" && item.type !== "partial_profile_v1") {
+					continue;
+				}
+				const candidate = browseCardSchema.safeParse(item.data);
+				if (candidate.success) {
+					cards.push(candidate.data);
+				}
+			}
+			return {
+				cards,
+				nextPage: parsed.nextPage ?? null,
+			};
+		},
+
+		async getProfileDetail(profileId: string): Promise<ProfileDetail> {
+			// Taken before the request, like blockListOwner above.
+			const copyOwner = profileCopyOwner();
+			const askedAt = Date.now();
+			const response = await fetchRest(`/v7/profiles/${profileId}`);
+			await assertSuccess(response, t("api.errors.load_profile_details"));
+			const parsed = profileDetailResponseSchema.parse(
+				await parseJsonSafe(response),
+			);
+
+			// The chat with this person shows the same star as their profile,
+			// and the same last-online time and distance.
+			void favoriteSeenInProfileAnswer(copyOwner, parsed.profiles[0], askedAt);
+			void presenceSeenInProfileAnswer(copyOwner, parsed.profiles[0]);
+
+			// Every real answer is kept on this device: once there is a block,
+			// or the account is gone, this endpoint only returns an empty stub.
+			rememberProfileAnswer(copyOwner, parsed.profiles[0]);
+			return parsed.profiles[0];
+		},
+
+		async getRawProfile(profileId: number | string): Promise<unknown> {
+			const response = await fetchRest(`/v7/profiles/${profileId}`);
+			await assertSuccess(response, t("api.errors.load_profile"));
+			return parseJsonSafe(response);
+		},
+
+		/**
+		 * GET /v4/me/profile — the read counterpart of updateMyProfile/
+		 * updateMyProfileImages (both write to /v4 or /v3 "me/profile*"
+		 * endpoints). Unlike GET /v7/profiles/:id (a different read path,
+		 * used for viewing arbitrary profiles), this one reliably reflects
+		 * edits made through those endpoints immediately — no read-after-
+		 * write lag — so the profile editor reloads through this after
+		 * saving photos/profile fields rather than getRawProfile.
+		 */
+		async getMyOwnProfile(): Promise<unknown> {
+			const response = await fetchRest("/v4/me/profile");
+			await assertSuccess(response, t("api.errors.load_profile"));
+			return parseJsonSafe(response);
+		},
+
+		async recordProfileView(profileId: number | string): Promise<void> {
+			if (!isRecordProfileViewsEnabled() || getIncognitoMode()) {
+				return;
+			}
+
+			try {
+				const response = await fetchRest(`/v4/views/${encodeURIComponent(String(profileId))}`, {
+					method: "POST",
+				});
+				if (response.status < 200 || response.status >= 300) {
+					appLog.warn(`Failed to record profile view: ${response.status}`);
+				}
+			} catch (error) {
+				appLog.error("Profile view recording error:", error);
+			}
+		},
+
+		/**
+		 * Batch-fetch profile cards for many ids in one request via the cascade
+		 * endpoint (POST /v3/profiles). Unlike GET /v7/profiles/{id}, this returns
+		 * displayName + media for profiles you've blocked, where the single-profile
+		 * endpoint comes back restricted/empty. Returns the raw `{ profiles: [...] }`
+		 * payload.
+		 */
+		async getProfilesByIds(profileIds: (number | string)[]): Promise<unknown> {
+			const targetProfileIds = profileIds
+				.map((id) => Number(id))
+				.filter((id) => !Number.isNaN(id));
+			const response = await fetchRest("/v3/profiles", {
+				method: "POST",
+				body: { targetProfileIds },
+			});
+			await assertSuccess(response, t("api.errors.load_profile"));
+			return parseJsonSafe(response);
+		},
+
+		async getVisitingMode(): Promise<VisitingMode> {
+			const response = await fetchRest("/v1/visiting/settings");
+			await assertSuccess(response, t("api.errors.load_visiting_mode"));
+			const payload = await parseJsonSafe(response);
+			const setting =
+				typeof payload === "object" && payload !== null
+					? (payload as { setting?: unknown }).setting
+					: null;
+
+			if (!isVisitingMode(setting)) {
+				throw new ApiFunctionError(
+					t("api.errors.invalid_visiting_mode_response"),
+					response.status,
+					payload,
+				);
+			}
+
+			return setting;
+		},
+
+		async updateVisitingMode(setting: VisitingMode): Promise<{ ok: true }> {
+			const response = await fetchRest("/v1/visiting/settings", {
+				method: "PUT",
+				body: { setting },
+			});
+			await assertSuccess(response, t("api.errors.save_visiting_mode"));
+			return { ok: true };
+		},
+
+		async getHomeLocation(): Promise<HomeLocation> {
+			const response = await fetchRest("/v1/visiting/home");
+			await assertSuccess(
+				response,
+				t("api.errors.load_home_location", { defaultValue: "Failed to load home location." }),
+			);
+			return homeLocationSchema.parse(await parseJsonSafe(response));
+		},
+
+		async updateHomeLocation(location: { lat: number; lon: number }): Promise<{ ok: true }> {
+			const response = await fetchRest("/v1/visiting/home", {
+				method: "PUT",
+				body: { lat: location.lat, lon: location.lon },
+			});
+			await assertSuccess(
+				response,
+				t("api.errors.save_home_location", { defaultValue: "Failed to save home location." }),
+			);
+			return { ok: true };
+		},
+
+		async getTravelPlans(profileId: number | string): Promise<TravelPlan[]> {
+			const response = await fetchRest(`/v6/profiles/travel/${profileId}`);
+			await assertSuccess(response, t("api.errors.load_travel_plans"));
+			const payload = await parseJsonSafe(response);
+			return travelPlansResponseSchema.parse(payload).travelPlans;
+		},
+
+		async createTravelPlan(payload: TravelPlanPayload): Promise<{ ok: true }> {
+			const { travelPlanId: _ignored, ...body } = payload;
+			const response = await fetchRest("/v6/profiles/travel", {
+				method: "POST",
+				body,
+			});
+			await assertSuccess(response, t("api.errors.save_travel_plan"));
+			return { ok: true };
+		},
+
+		async updateTravelPlan(payload: TravelPlanPayload & { travelPlanId: number }): Promise<{ ok: true }> {
+			const response = await fetchRest("/v6/profiles/travel/update", {
+				method: "POST",
+				body: payload,
+			});
+			await assertSuccess(response, t("api.errors.save_travel_plan"));
+			return { ok: true };
+		},
+
+		async deleteTravelPlan(travelPlanId: number): Promise<{ ok: true }> {
+			const response = await fetchRest(`/v6/profiles/travel/${travelPlanId}`, {
+				method: "DELETE",
+			});
+			await assertSuccess(response, t("api.errors.delete_travel_plan"));
+			return { ok: true };
+		},
+
+		async updateMyProfile(payload: unknown): Promise<{ ok: true }> {
+			const response = await fetchRest("/v4/me/profile", {
+				method: "PATCH",
+				body: payload,
+			});
+			await assertSuccess(response, t("api.errors.save_profile"));
+			return { ok: true };
+		},
+
+		// PATCH /v4/me/profile silently ignores explicit `null` values meant to
+		// clear a field (e.g. resetting bodyType/ethnicity to "not set"). Doing a
+		// full replace avoids that partial-merge behavior.
+		async replaceMyProfile(payload: unknown): Promise<{ ok: true }> {
+			const response = await fetchRest("/v3.1/me/profile", {
+				method: "PUT",
+				body: payload,
+			});
+			await assertSuccess(response, t("api.errors.save_profile"));
+			return { ok: true };
+		},
+
+		async updateMyProfileImages(payload: {
+			primaryImageHash: string | null;
+			secondaryImageHashes: string[];
+		}): Promise<{ ok: true }> {
+			const response = await fetchRest("/v3/me/profile/images", {
+				method: "PUT",
+				body: payload,
+			});
+			await assertSuccess(response, t("api.errors.update_photos"));
+			return { ok: true };
+		},
+
+		/**
+		 * GET /v3.1/me/profile/images — the full pool of images uploaded to the
+		 * account, independent of which ones are currently selected into the
+		 * profile's photo slots (that selection lives in `medias`/
+		 * `profileImageMediaHash` on the profile itself). Used by the profile
+		 * picture drawer to let a user pick from previously-uploaded images
+		 * without re-uploading them.
+		 */
+		async getProfileImages(): Promise<{ mediaHash: string; type: number; state: number | null }[]> {
+			const response = await fetchRest("/v3.1/me/profile/images");
+			await assertSuccess(response, t("api.errors.load_photos"));
+			const payload = await parseJsonSafe(response);
+			const medias =
+				typeof payload === "object" && payload !== null
+					? (payload as { medias?: unknown }).medias
+					: null;
+			if (!Array.isArray(medias)) {
+				return [];
+			}
+
+			return medias
+				.map((item) => {
+					if (typeof item !== "object" || item === null) return null;
+					const hashRaw = (item as { mediaHash?: unknown }).mediaHash;
+					if (typeof hashRaw !== "string" || !hashRaw) return null;
+					const typeRaw = (item as { type?: unknown }).type;
+					const stateRaw = (item as { state?: unknown }).state;
+					return {
+						mediaHash: hashRaw,
+						type: typeof typeRaw === "number" ? typeRaw : 0,
+						state: typeof stateRaw === "number" ? stateRaw : null,
+					};
+				})
+				.filter((item): item is { mediaHash: string; type: number; state: number | null } => item !== null);
+		},
+
+		async deleteMyProfileImages(mediaHashes: string[]): Promise<{ ok: true }> {
+			const response = await fetchRest("/v3/me/profile/images", {
+				method: "DELETE",
+				body: { media_hashes: mediaHashes },
+			});
+			await assertSuccess(response, t("api.errors.delete_photos"));
+			return { ok: true };
+		},
+
+		async uploadProfileImage(params: {
+			path: string;
+			body: Uint8Array;
+			contentType: string;
+		}): Promise<ProfileImageUploadResult> {
+			const response = await fetchRest(params.path, {
+				method: "POST",
+				rawBody: params.body,
+				contentType: params.contentType,
+			});
+			await assertSuccess(response, t("api.errors.upload_image"));
+			const payload = await parseJsonSafe(response);
+			if (typeof payload !== "object" || payload === null) {
+				throw new ApiFunctionError(
+					t("api.errors.invalid_upload_profile_response"),
+					response.status,
+					payload,
+				);
+			}
+			return payload as ProfileImageUploadResult;
+		},
+	};
+}

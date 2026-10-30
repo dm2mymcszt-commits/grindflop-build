@@ -1,0 +1,39 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "GrindFlop",
+	"mainBinaryName": "GrindFlop",
+	"version": "0.5.3",
+	"identifier": "dev.estopia.free-grind",
+	"build": {
+		"beforeDevCommand": "bun run dev:web",
+		"devUrl": "http://localhost:1420",
+		"beforeBuildCommand": "bun run build",
+		"frontendDist": "../dist"
+	},
+	"app": {
+		"windows": [
+			{
+				"title": "GrindFlop",
+				"width": 1000,
+				"height": 800,
+				"decorations": false,
+				"transparent": true,
+				"shadow": false,
+				"userAgent": "GrindFlop/0.5.3",
+				"dragDropEnabled": false
+			}
+		],
+		"security": {
+			"csp": null
+		}
+	},
+	"bundle": {
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		]
+	}
+}

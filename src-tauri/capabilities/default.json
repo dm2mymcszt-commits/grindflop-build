@@ -1,0 +1,66 @@
+{
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "default",
+	"description": "Capability for the main window",
+	"windows": ["main"],
+	"permissions": [
+		"core:default",
+		"core:window:allow-minimize",
+		"core:window:allow-toggle-maximize",
+		"core:window:allow-close",
+		"core:window:allow-start-dragging",
+		"core:window:allow-set-shadow",
+		"opener:default",
+		{
+			"identifier": "opener:allow-open-url",
+			"allow": [
+				{ "url": "geo:*" },
+				{ "url": "https://www.google.com/maps/*" }
+			]
+		},
+		"notification:default",
+		"fs:default",
+		{
+			"identifier": "fs:allow-exists",
+			"allow": [
+				{
+					"path": "$APPDATA/preferences.json"
+				}
+			]
+		},
+		{
+			"identifier": "fs:allow-app-read",
+			"allow": [
+				{
+					"path": "$APPDATA/preferences.json"
+				}
+			]
+		},
+		{
+			"identifier": "fs:allow-app-write",
+			"allow": [
+				{
+					"path": "$APPDATA/preferences.json"
+				}
+			]
+		},
+		"fs:allow-appcache-write-recursive",
+		"geolocation:allow-check-permissions",
+		"geolocation:allow-request-permissions",
+		"geolocation:allow-get-current-position",
+		{
+			"identifier": "http:default",
+			"allow": [
+				{ "url": "https://*.cloudfront.net/*" },
+				{ "url": "https://cdns.grindr.com/*" },
+				{ "url": "https://yandex.com/*" }
+			]
+		},
+		"sql:default",
+		"sql:allow-load",
+		"sql:allow-execute",
+		"sql:allow-select",
+		"sql:allow-close",
+		"os:default"
+	]
+}

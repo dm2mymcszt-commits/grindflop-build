@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Free Grind uses your location to show nearby profiles and let you set your browsing location.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Free Grind uses your location to show nearby profiles and let you set your browsing location.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Free Grind needs access to your photo library to let you choose photos to share or upload to your profile.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Free Grind needs permission to save photos and videos to your photo library.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Free Grind needs access to your camera to let you take photos to share or upload to your profile.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Free Grind needs access to your microphone to record voice messages.</string>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>INSendMessageIntent</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>Calculator</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>DisguiseCalculator</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Notes</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>DisguiseNotes</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Weather</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>DisguiseWeather</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
+	<key>CFBundleIcons~ipad</key>
+	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>Calculator</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>DisguiseCalculator</string>
+					<string>DisguiseCalculator-76</string>
+					<string>DisguiseCalculator-83.5</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Notes</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>DisguiseNotes</string>
+					<string>DisguiseNotes-76</string>
+					<string>DisguiseNotes-83.5</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+			<key>Weather</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array>
+					<string>DisguiseWeather</string>
+					<string>DisguiseWeather-76</string>
+					<string>DisguiseWeather-83.5</string>
+				</array>
+				<key>UIPrerenderedIcon</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

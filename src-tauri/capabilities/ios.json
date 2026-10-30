@@ -1,0 +1,26 @@
+{
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "ios-features",
+	"description": "Capabilities specific to iOS (ios-photos plugin is only compiled in for iOS, plus backup files written into the app's Documents folder, which UIFileSharingEnabled exposes in the Files app)",
+	"platforms": ["iOS"],
+	"windows": ["main"],
+	"permissions": [
+		"ios-photos:default",
+		{
+			"identifier": "fs:allow-mkdir",
+			"allow": [{ "path": "$DOCUMENT" }, { "path": "$DOCUMENT/**" }]
+		},
+		{
+			"identifier": "fs:allow-write-file",
+			"allow": [{ "path": "$DOCUMENT/**" }]
+		},
+		{
+			"identifier": "fs:allow-exists",
+			"allow": [{ "path": "$DOCUMENT/**" }]
+		},
+		{
+			"identifier": "fs:allow-remove",
+			"allow": [{ "path": "$DOCUMENT/**" }]
+		}
+	]
+}

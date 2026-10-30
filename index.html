@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<link rel="icon" type="image/webp" href="/newLogo.webp" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+		/>
+		<title>GrindFlop</title>
+		<!-- Painted before any stylesheet or script loads: without it the webview
+		     shows its own white background for the first frames, which reads as a
+		     flash every time the app opens. -->
+		<style>
+			html,
+			body {
+				margin: 0;
+				background: #05070a;
+			}
+			@media (prefers-color-scheme: light) {
+				html,
+				body {
+					background: #f5f7fa;
+				}
+			}
+		</style>
+	</head>
+
+	<body>
+		<div id="app"></div>
+		<script type="module" src="/src/main.tsx"></script>
+	</body>
+</html>

@@ -1,0 +1,977 @@
+import { RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition, type CSSProperties, type TouchEvent } from "react";
+import { useTranslation } from "react-i18next";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useInterestData } from "../../hooks/queries/useInterestQueries";
+import { useBlockedProfileIds } from "../../hooks/queries/useProfileQueries";
+import { getBlockStatesByProfileIds } from "../../services/chatDb";
+import { markInterestSeen, getInterestTabLastSeen, markInterestTabSeen } from "../../services/seenStore";
+import { EmptyState, ErrorState } from "../../components/ui/states";
+import { PullToRefreshContainer } from "./components/PullToRefreshContainer";
+import {
+	type InterestTab,
+	type InterestItem,
+	type InterestViewsCountMode,
+	type InterestViewsSort,
+	type InterestViewsWindow,
+	INTEREST_VIEWS_COUNT_MODE_KEY,
+	INTEREST_VIEWS_SORT_KEY,
+	INTEREST_VIEWS_WINDOW_KEY,
+	PREVIEW_ID_PREFIX,
+	filterViewsByWindow,
+	nextViewsWindow,
+	readStoredViewsCountMode,
+	readStoredViewsSort,
+	readStoredViewsWindow,
+	sortViewItems,
+} from "./interest/interestUtils";
+import {
+	InterestTabs,
+	InterestRow,
+	ViewsSortToggle,
+	ViewsWindowToggle,
+} from "./interest/InterestComponents";
+import { InterestOnboardingModal } from "./interest/InterestOnboardingModal";
+import {
+	SCROLL_RESTORATION_TIMEOUT_MS,
+} from "../../config/ui-constants";
+import { cn } from "../../utils/cn";
+import { PageHeaderBackground } from "../../components/ui/PageHeaderBackground";
+import { FeedScrollContainer } from "../../components/ui/FeedScrollContainer";
+import { usePreferences } from "../../contexts/PreferencesContext";
+import { useAuth } from "../../contexts/useAuth";
+import { useLocalNicknames } from "../../hooks/useLocalNicknames";
+import { clearTapNotifications } from "../../services/localNotify";
+import {
+	GOOGLE_DRIVE_SYNC_DATA_APPLIED_EVENT,
+	type GoogleDriveSyncDataAppliedDetail,
+} from "../../services/googleDriveSyncRuntime";
+
+const ONBOARDING_KEY = "fg-interest-onboarding-seen";
+
+// SET THIS TO TRUE FOR DEBUGGING: Always triggers bounce and long delay on refresh
+const ALWAYS_BOUNCE_FOR_DEBUG = false;
+
+// Persistent flag for the session to prevent multiple bounces when navigating back and forth
+let globalHasBounced = false;
+let globalHasShownCount = false;
+
+function InterestSkeleton({ mode }: { mode: InterestTab }) {
+	return (
+		<div className="flex items-center gap-4 border-b border-[var(--surface-2)] py-3 pl-4 pr-4">
+			<div className="h-14 w-14 shrink-0 animate-pulse rounded-2xl bg-[var(--surface-2)]" />
+			<div className="flex flex-1 flex-col gap-2">
+				<div className="h-3 w-28 animate-pulse rounded-full bg-[var(--surface-2)]" />
+				<div className="h-2.5 w-16 animate-pulse rounded-full bg-[var(--border)]" />
+			</div>
+			{mode === "taps" ? (
+				<div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
+			) : (
+				<div className="h-8 w-14 shrink-0 animate-pulse rounded-full bg-[var(--surface-2)]" />
+			)}
+		</div>
+	);
+}
+
+export function InterestPage() {
+	const { t } = useTranslation();
+	const navigate = useNavigate();
+	const location = useLocation();
+	const { userId, settingsReady } = useAuth();
+	const localNicknames = useLocalNicknames();
+	const [searchParams, setSearchParams] = useSearchParams();
+	const defaultSetting = window.localStorage.getItem("fg-interest-default-tab") === "views" ? "views" : "taps";
+	const activeTab: InterestTab = searchParams.get("tab") === "taps" || searchParams.get("tab") === "views"
+		? (searchParams.get("tab") as InterestTab)
+		: defaultSetting;
+
+	// The taps are on screen, so the notifications announcing them come down.
+	useEffect(() => {
+		if (activeTab === "taps") {
+			void clearTapNotifications();
+		}
+	}, [activeTab]);
+
+	const { data, isLoading: isQueryLoading, isFetching, error: queryError, refetch } = useInterestData();
+	const [isDemoLoading, setIsDemoLoading] = useState(false);
+	const isLoading = isQueryLoading || isDemoLoading;
+
+	const { developerMode, showDebugInfo } = usePreferences();
+	const [demoMode, setDemoMode] = useState(() => {
+		const saved = window.localStorage.getItem("fg-interest-demo-mode");
+		return saved ? Number.parseInt(saved, 10) : 0;
+	});
+	const [demoViewsCount, setDemoViewsCount] = useState(() => {
+		if (demoMode === 2 || demoMode === 3) return 12;
+		return 0;
+	});
+	const [demoTapsCount, setDemoTapsCount] = useState(() => {
+		if (demoMode === 1 || demoMode === 3) return 5;
+		return 0;
+	});
+
+	const [demoAddedViews, setDemoAddedViews] = useState<InterestItem[]>([]);
+	const [demoAddedTaps, setDemoAddedTaps] = useState<InterestItem[]>([]);
+
+	useEffect(() => {
+		if (demoMode === 0 || !developerMode) {
+			setDemoAddedViews([]);
+			setDemoAddedTaps([]);
+			return;
+		}
+
+		const startDelay = setTimeout(() => {
+			let cycle = 0;
+			const targetCounts = [5, 55, 555, 5555];
+
+			const interval = setInterval(() => {
+				const target = targetCounts[cycle % targetCounts.length];
+				cycle++;
+
+				if (demoMode === 1 || demoMode === 3) {
+					setDemoTapsCount(target);
+					setDemoAddedTaps(Array(target).fill({ profileId: "demo", timestamp: Date.now() }));
+				}
+				if (demoMode === 2 || demoMode === 3) {
+					setDemoViewsCount(target);
+					// To make viewedCount exactly match the target:
+					setDemoAddedViews(Array(target).fill({ profileId: "demo", timestamp: Date.now() }));
+				}
+			}, 5000);
+			return () => clearInterval(interval);
+		}, 7000);
+
+		return () => clearTimeout(startDelay);
+	}, [demoMode]);
+
+	const views = useMemo(() => {
+		const base = data?.views ?? [];
+		return demoMode !== 0 ? [...demoAddedViews, ...base] : base;
+	}, [data?.views, demoAddedViews, demoMode]);
+
+	const taps = useMemo(() => {
+		const base = data?.taps ?? [];
+		return demoMode !== 0 ? [...demoAddedTaps, ...base] : base;
+	}, [data?.taps, demoAddedTaps, demoMode]);
+
+	const viewedCount = demoMode !== 0 ? demoAddedViews.length : (data?.viewedCount ?? 0);
+
+	// Profiles we've blocked — same list ChatPage/GridPage use to gate their
+	// own block-aware UI.
+	const { data: blockedProfileIdsData } = useBlockedProfileIds();
+	const blockedByMeProfileIds = useMemo(
+		() => new Set(blockedProfileIdsData ?? []),
+		[blockedProfileIdsData],
+	);
+
+	// Profiles that blocked us. There's no server list for this direction —
+	// it's only knowable locally, from a conversation's block_state (set by
+	// ChatPage/GridProfilePage when a 403/WS event reveals it). Mirrors how
+	// chat itself gates profile navigation off conversation state instead of
+	// a dedicated "blocked by" check.
+	const [blockedByOtherProfileIds, setBlockedByOtherProfileIds] = useState<Set<string>>(new Set());
+	useEffect(() => {
+		const profileIds = [...new Set([...views, ...taps].map((item) => item.profileId))].filter(
+			(id) => !id.startsWith(PREVIEW_ID_PREFIX),
+		);
+		if (profileIds.length === 0) {
+			setBlockedByOtherProfileIds(new Set());
+			return;
+		}
+		let cancelled = false;
+		void getBlockStatesByProfileIds(profileIds)
+			.then((blockStates) => {
+				if (cancelled) return;
+				const blockedByOther = new Set(
+					[...blockStates.entries()]
+						.filter(([, state]) => state === "blocked_by_other")
+						.map(([profileId]) => profileId),
+				);
+				setBlockedByOtherProfileIds(blockedByOther);
+			})
+			.catch(() => {});
+		return () => {
+			cancelled = true;
+		};
+	}, [views, taps]);
+
+	const isProfileBlocked = useCallback(
+		(profileId: string) => blockedByMeProfileIds.has(profileId) || blockedByOtherProfileIds.has(profileId),
+		[blockedByMeProfileIds, blockedByOtherProfileIds],
+	);
+
+	// Viewers we blocked that Grindr has since stopped counting.
+	//
+	// Blocking removes a profile from the server's viewers list, so
+	// `viewedCount` (its own totalViewers) ticks down and stops describing how
+	// many people actually looked at us — the auto-blocker makes that drift
+	// fast. These rows survive locally in the recovery store, so they can be
+	// added back exactly rather than estimated. Anything the server still
+	// lists — including as a locked preview matched on photo hash — is still
+	// inside totalViewers and is skipped, so nobody is counted twice.
+	const hiddenBlockedViewersCount = useMemo(() => {
+		if (blockedByMeProfileIds.size === 0) return 0;
+		const serverProfileIds = new Set(data?.serverProfileIds ?? []);
+		const serverImageHashes = new Set(data?.serverImageHashes ?? []);
+		let hidden = 0;
+		for (const item of views) {
+			if (item.profileId.startsWith(PREVIEW_ID_PREFIX)) continue;
+			if (!blockedByMeProfileIds.has(item.profileId)) continue;
+			if (serverProfileIds.has(item.profileId)) continue;
+			if (item.imageHash && serverImageHashes.has(item.imageHash)) continue;
+			hidden += 1;
+		}
+		return hidden;
+	}, [views, blockedByMeProfileIds, data?.serverProfileIds, data?.serverImageHashes]);
+
+	const realViewedCount = viewedCount + hiddenBlockedViewersCount;
+
+	// How the Views tab is ordered. Persisted, because someone who wants the
+	// leaderboard generally wants it every time they open the tab.
+	const [viewsSort, setViewsSort] = useState<InterestViewsSort>(readStoredViewsSort);
+	// Recency scope for the Views tab, persisted for the same reason as the sort.
+	const [viewsWindow, setViewsWindow] = useState<InterestViewsWindow>(readStoredViewsWindow);
+	// Whether the counter reports Grindr's own total or the real one that still
+	// counts the people we blocked. Persisted like the sort and window above.
+	const [viewsCountMode, setViewsCountMode] =
+		useState<InterestViewsCountMode>(readStoredViewsCountMode);
+	// The two totals only diverge in the unfiltered scope: a windowed count is
+	// computed from the local list, which never lost the blocked rows to begin
+	// with, so there is nothing there to switch between.
+	const canToggleCountMode = activeTab === "views" && viewsWindow === "all";
+	const isRealCount = canToggleCountMode && viewsCountMode === "real";
+
+	const [lastSeenViews, setLastSeenViews] = useState(() => getInterestTabLastSeen("views"));
+	const [lastSeenTaps, setLastSeenTaps] = useState(() => getInterestTabLastSeen("taps"));
+
+	useEffect(() => {
+		if (!settingsReady || userId == null) return;
+		const handleCloudDataApplied = (event: Event) => {
+			const detail = (event as CustomEvent<GoogleDriveSyncDataAppliedDetail>).detail;
+			if (detail?.profileId !== userId) return;
+			setViewsSort(readStoredViewsSort());
+			setViewsWindow(readStoredViewsWindow());
+			setViewsCountMode(readStoredViewsCountMode());
+			setLastSeenViews(getInterestTabLastSeen("views"));
+			setLastSeenTaps(getInterestTabLastSeen("taps"));
+		};
+		window.addEventListener(
+			GOOGLE_DRIVE_SYNC_DATA_APPLIED_EVENT,
+			handleCloudDataApplied,
+		);
+		return () => {
+			window.removeEventListener(
+				GOOGLE_DRIVE_SYNC_DATA_APPLIED_EVENT,
+				handleCloudDataApplied,
+			);
+		};
+	}, [settingsReady, userId]);
+
+	// Tabs the user has just switched to: their badge is hidden immediately (in
+	// the same render as the switch) so the pill slide and the badge collapse
+	// animate together instead of as two staggered steps. Cleared once the
+	// delayed "mark as seen" below actually catches lastSeen up to match.
+	const [justSwitchedTabs, setJustSwitchedTabs] = useState<Set<InterestTab>>(() => new Set());
+
+	const newViewsCount = useMemo(() => {
+		if (demoMode !== 0) return demoViewsCount;
+		if (justSwitchedTabs.has("views")) return 0;
+		return views.filter(v => (v.timestamp ?? 0) > lastSeenViews).length;
+	}, [views, lastSeenViews, demoMode, demoViewsCount, justSwitchedTabs]);
+
+	const newTapsCount = useMemo(() => {
+		if (demoMode !== 0) return demoTapsCount;
+		if (justSwitchedTabs.has("taps")) return 0;
+		return taps.filter(t => (t.timestamp ?? 0) > lastSeenTaps).length;
+	}, [taps, lastSeenTaps, demoMode, demoTapsCount, justSwitchedTabs]);
+
+	// Mark active tab as seen
+	useEffect(() => {
+		if (data) {
+			const items = activeTab === "views" ? views : taps;
+			const maxInItems = items.length > 0 ? Math.max(...items.map(i => i.timestamp ?? 0)) : 0;
+			const at = Math.max(Date.now(), maxInItems);
+
+			// Delay persisting "seen" so a quick tab switch-and-back doesn't
+			// immediately drop the badge; the badge itself is already hidden
+			// right away via justSwitchedTabs above.
+			const timer = setTimeout(() => {
+				if (demoMode !== 0) {
+					if (activeTab === "views") setDemoViewsCount(0);
+					else setDemoTapsCount(0);
+				}
+
+				markInterestTabSeen(activeTab, at);
+				if (activeTab === "views") {
+					setLastSeenViews(at);
+				} else {
+					setLastSeenTaps(at);
+				}
+				setJustSwitchedTabs((prev) => {
+					if (!prev.has(activeTab)) return prev;
+					const next = new Set(prev);
+					next.delete(activeTab);
+					return next;
+				});
+			}, 300);
+
+			return () => clearTimeout(timer);
+		}
+	}, [activeTab, data, views, taps, demoMode]);
+
+	const handleSetDemoMode = useCallback((mode: number) => {
+		setDemoMode(mode);
+		window.localStorage.setItem("fg-interest-demo-mode", mode.toString());
+		setDemoAddedViews([]);
+		setDemoAddedTaps([]);
+
+		if (mode !== 0) {
+			setIsDemoLoading(true);
+			setTimeout(() => setIsDemoLoading(false), 1000);
+		}
+
+		if (mode === 1) { // Taps
+			setDemoTapsCount(5);
+			setDemoViewsCount(0);
+		} else if (mode === 2) { // Visitors
+			setDemoViewsCount(12);
+			setDemoTapsCount(0);
+		} else if (mode === 3) { // Both
+			setDemoViewsCount(12);
+			setDemoTapsCount(5);
+		} else {
+			setDemoViewsCount(0);
+			setDemoTapsCount(0);
+		}
+	}, []);
+
+	const [nowTimestamp, setNowTimestamp] = useState(() => Date.now());
+	const [showCountLabel, setShowCountLabel] = useState(false);
+	const countLabelHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	useEffect(
+		() => () => {
+			if (countLabelHideTimerRef.current) clearTimeout(countLabelHideTimerRef.current);
+		},
+		[],
+	);
+
+	// Track the newest activity across both taps and views.
+	const maxInterestTimestamp = useMemo(() => {
+		let max = 0;
+		for (const list of [views, taps]) {
+			for (const item of list) {
+				if (item.timestamp && item.timestamp > max) {
+					max = item.timestamp;
+				}
+			}
+		}
+		return max;
+	}, [views, taps]);
+
+	const [showOnboarding, setShowOnboarding] = useState(() => {
+		return !localStorage.getItem(ONBOARDING_KEY);
+	});
+	const [shouldBounce, setShouldBounce] = useState(false);
+	const touchStartXRef = useRef<number | null>(null);
+
+	const isFirstRender = useRef(true);
+
+	// Trigger peek animation
+	useEffect(() => {
+		if (!ALWAYS_BOUNCE_FOR_DEBUG && globalHasBounced && demoMode === 0) return;
+
+		const timer = setTimeout(() => {
+			setShouldBounce(true);
+			globalHasBounced = true;
+			// Reset bounce state after animation finishes
+			setTimeout(() => setShouldBounce(false), 1000);
+		}, 600);
+		return () => clearTimeout(timer);
+	}, [demoMode]);
+
+	const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
+	const feedContainerRef = useRef<HTMLDivElement | null>(null);
+	const [hasRestoredScroll, setHasRestoredScroll] = useState(false);
+	const prevTabRef = useRef<InterestTab>(activeTab);
+
+	// Re-activate onboarding when switching back to views tab if not yet acknowledged
+	useEffect(() => {
+		if (activeTab === "views" && !localStorage.getItem(ONBOARDING_KEY)) {
+			setShowOnboarding(true);
+		}
+	}, [activeTab]);
+
+	const handleCloseOnboarding = useCallback(() => {
+		setShowOnboarding(false);
+	}, []);
+
+	const handleAcknowledgeOnboarding = useCallback(() => {
+		setShowOnboarding(false);
+		localStorage.setItem(ONBOARDING_KEY, "true");
+	}, []);
+
+	const ITEMS_PER_PAGE = 30;
+	const [viewsLimit, setViewsLimit] = useState(() => {
+		const saved = sessionStorage.getItem("interest-scroll-views");
+		if (saved) {
+			try {
+				const { limit, timestamp } = JSON.parse(saved) as { limit: number; timestamp: number };
+				if (limit && Date.now() - timestamp < SCROLL_RESTORATION_TIMEOUT_MS) {
+					return limit;
+				}
+			} catch (e) {}
+		}
+		return ITEMS_PER_PAGE;
+	});
+	const [tapsLimit, setTapsLimit] = useState(() => {
+		const saved = sessionStorage.getItem("interest-scroll-taps");
+		if (saved) {
+			try {
+				const { limit, timestamp } = JSON.parse(saved) as { limit: number; timestamp: number };
+				if (limit && Date.now() - timestamp < SCROLL_RESTORATION_TIMEOUT_MS) {
+					return limit;
+				}
+			} catch (e) {}
+		}
+		return ITEMS_PER_PAGE;
+	});
+	const [isPending, startTransition] = useTransition();
+
+	const isRankedViews = activeTab === "views" && viewsSort === "most_viewed";
+
+	// Windowed before ranked, so positions read 1..N within the period rather
+	// than carrying gaps in from the full list.
+	const windowedViews = useMemo(
+		() => filterViewsByWindow(views, viewsWindow, nowTimestamp),
+		[views, viewsWindow, nowTimestamp],
+	);
+
+	const activeItems = useMemo(
+		() => (activeTab === "views" ? sortViewItems(windowedViews, viewsSort) : taps),
+		[activeTab, taps, windowedViews, viewsSort],
+	);
+
+	// Distinguishes "you have no views" from "no views in this period", which
+	// need different empty states.
+	const isWindowEmptied =
+		activeTab === "views" && viewsWindow !== "all" && views.length > 0 && activeItems.length === 0;
+
+	const displayedItems = useMemo(() => {
+		const limit = activeTab === "views" ? viewsLimit : tapsLimit;
+		return activeItems.slice(0, limit);
+	}, [activeTab, activeItems, viewsLimit, tapsLimit]);
+
+	const hasMoreItems = activeItems.length > displayedItems.length;
+
+	const handleLoadMore = useCallback(() => {
+		startTransition(() => {
+			if (activeTab === "views") {
+				setViewsLimit((prev: number) => prev + ITEMS_PER_PAGE);
+			} else {
+				setTapsLimit((prev: number) => prev + ITEMS_PER_PAGE);
+			}
+		});
+	}, [activeTab]);
+
+	// Infinite scroll observer
+	useEffect(() => {
+		if (!hasMoreItems || isLoading) return;
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting) {
+					handleLoadMore();
+				}
+			},
+			{ threshold: 0.1, rootMargin: "100px" },
+		);
+
+		const currentTrigger = loadMoreTriggerRef.current;
+		if (currentTrigger) {
+			observer.observe(currentTrigger);
+		}
+
+		return () => {
+			if (currentTrigger) {
+				observer.unobserve(currentTrigger);
+			}
+		};
+	}, [hasMoreItems, isLoading, handleLoadMore]);
+
+	// Reset limits and scroll restoration when changing tabs
+	useEffect(() => {
+		if (prevTabRef.current !== activeTab) {
+			setViewsLimit(ITEMS_PER_PAGE);
+			setTapsLimit(ITEMS_PER_PAGE);
+			setHasRestoredScroll(false);
+			prevTabRef.current = activeTab;
+		}
+	}, [activeTab]);
+
+	// Clear scroll memory for a specific tab when NEW activity is detected in that tab
+	const prevMaxViewsTs = useRef(lastSeenViews);
+	const prevMaxTapsTs = useRef(lastSeenTaps);
+
+	useEffect(() => {
+		const maxViews = views.length > 0 ? Math.max(...views.map(v => v.timestamp ?? 0)) : 0;
+		if (maxViews > prevMaxViewsTs.current) {
+			sessionStorage.removeItem("interest-scroll-views");
+			if (activeTab === "views") {
+				feedContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+			}
+		}
+		if (maxViews > 0) prevMaxViewsTs.current = maxViews;
+
+		const maxTaps = taps.length > 0 ? Math.max(...taps.map(t => t.timestamp ?? 0)) : 0;
+		if (maxTaps > prevMaxTapsTs.current) {
+			sessionStorage.removeItem("interest-scroll-taps");
+			if (activeTab === "taps") {
+				feedContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+			}
+		}
+		if (maxTaps > 0) prevMaxTapsTs.current = maxTaps;
+	}, [views, taps, activeTab]);
+
+	useEffect(() => {
+		const container = feedContainerRef.current;
+		if (!container) return;
+
+		const handleScroll = () => {
+			const scrollData = {
+				top: container.scrollTop,
+				limit: activeTab === "views" ? viewsLimit : tapsLimit,
+				timestamp: Date.now()
+			};
+			sessionStorage.setItem(`interest-scroll-${activeTab}`, JSON.stringify(scrollData));
+		};
+
+		container.addEventListener("scroll", handleScroll, { passive: true });
+		return () => container.removeEventListener("scroll", handleScroll);
+	}, [activeTab, viewsLimit, tapsLimit]);
+
+	useLayoutEffect(() => {
+		if (displayedItems.length > 0 && !isLoading && !hasRestoredScroll && feedContainerRef.current) {
+			const storageKey = `interest-scroll-${activeTab}`;
+
+			// If there's new activity since the last time we "saw" this tab,
+			// don't restore the scroll position - stay at the top.
+			const currentItems = activeTab === "views" ? views : taps;
+			const maxTs = currentItems.length > 0 ? Math.max(...currentItems.map(i => i.timestamp ?? 0)) : 0;
+			const lastSeen = activeTab === "views" ? lastSeenViews : lastSeenTaps;
+
+			if (maxTs > lastSeen) {
+				sessionStorage.removeItem(storageKey);
+				feedContainerRef.current.scrollTop = 0;
+				setHasRestoredScroll(true);
+				return;
+			}
+
+			const saved = sessionStorage.getItem(storageKey);
+			if (saved) {
+				try {
+					const { top, timestamp } = JSON.parse(saved) as { top: number; timestamp: number };
+
+					// Only restore if the scroll position is less than the timeout
+					if (Date.now() - timestamp < SCROLL_RESTORATION_TIMEOUT_MS) {
+						feedContainerRef.current.scrollTop = top;
+					} else {
+						// Clean up expired scroll data
+						sessionStorage.removeItem(storageKey);
+					}
+				} catch (e) {
+					sessionStorage.removeItem(storageKey);
+				}
+			} else {
+				// If no saved position, ensure we are at the top for the new tab
+				feedContainerRef.current.scrollTop = 0;
+			}
+			setHasRestoredScroll(true);
+		}
+	}, [displayedItems.length, isLoading, hasRestoredScroll, activeTab, lastSeenViews, lastSeenTaps, views, taps]);
+
+	// Keep relative timestamps fresh.
+	useEffect(() => {
+		const id = window.setInterval(() => setNowTimestamp(Date.now()), 30_000);
+		return () => window.clearInterval(id);
+	}, []);
+
+	// Mark Interest as "seen" whenever the user is on this page so the
+	// NavBar dot clears.
+	useEffect(() => {
+		if (data) {
+			markInterestSeen(Math.max(Date.now(), maxInterestTimestamp));
+		}
+	}, [activeTab, maxInterestTimestamp, data]);
+
+	// Animate the count label: show it briefly on tab change, then hide it.
+	useEffect(() => {
+		setShowCountLabel(false);
+
+		// Synchronize with the bounce: Only long delay if a bounce is actually happening
+		// ALWAYS_BOUNCE_FOR_DEBUG forces the long delay.
+		// Otherwise, we only wait long if it's the very first render AND we haven't bounced yet.
+		const willBounceNow = !globalHasBounced || demoMode !== 0;
+		const isInitialLook = ALWAYS_BOUNCE_FOR_DEBUG || (isFirstRender.current && willBounceNow);
+
+		const delay = isInitialLook ? 2200 : 800;
+
+		// Only show the animation once per session, but keep the delay logic above for future use
+		if (ALWAYS_BOUNCE_FOR_DEBUG || !globalHasShownCount || demoMode !== 0) {
+			const timer = setTimeout(() => {
+				setShowCountLabel(true);
+				globalHasShownCount = true;
+			}, delay);
+			const hideTimer = setTimeout(() => setShowCountLabel(false), delay + 4000);
+
+			isFirstRender.current = false;
+
+			return () => {
+				clearTimeout(timer);
+				clearTimeout(hideTimer);
+			};
+		}
+
+		isFirstRender.current = false;
+	}, [activeTab, demoMode]);
+
+	const handleRefresh = useCallback(() => {
+		if (activeTab === "views") {
+			setViewsLimit(ITEMS_PER_PAGE);
+			sessionStorage.removeItem("interest-scroll-views");
+		} else {
+			setTapsLimit(ITEMS_PER_PAGE);
+			sessionStorage.removeItem("interest-scroll-taps");
+		}
+		setHasRestoredScroll(true);
+		feedContainerRef.current?.scrollTo(0, 0);
+		return refetch();
+	}, [activeTab, refetch, ITEMS_PER_PAGE]);
+
+	const handleToggleViewsSort = useCallback(() => {
+		setViewsSort((prev) => {
+			const next: InterestViewsSort = prev === "most_viewed" ? "recent" : "most_viewed";
+			try {
+				window.localStorage.setItem(INTEREST_VIEWS_SORT_KEY, next);
+			} catch {}
+			return next;
+		});
+		// Reordering the whole list makes the old scroll offset meaningless, and
+		// a leaderboard is only worth showing from the top.
+		setViewsLimit(ITEMS_PER_PAGE);
+		sessionStorage.removeItem("interest-scroll-views");
+		setHasRestoredScroll(true);
+		feedContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+	}, [ITEMS_PER_PAGE]);
+
+	const handleCycleViewsWindow = useCallback(() => {
+		setViewsWindow((previous) => {
+			const next = nextViewsWindow(previous);
+			try {
+				window.localStorage.setItem(INTEREST_VIEWS_WINDOW_KEY, next);
+			} catch {}
+			return next;
+		});
+		// Same reasoning as the sort toggle: the list is a different list now.
+		setViewsLimit(ITEMS_PER_PAGE);
+		sessionStorage.removeItem("interest-scroll-views");
+		setHasRestoredScroll(true);
+		feedContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+	}, [ITEMS_PER_PAGE]);
+
+	// Only the counter changes here, never the list — so unlike the sort and
+	// window toggles this deliberately leaves the scroll position alone.
+	const handleToggleViewsCountMode = useCallback(() => {
+		setViewsCountMode((previous) => {
+			const next: InterestViewsCountMode = previous === "real" ? "grindr" : "real";
+			try {
+				window.localStorage.setItem(INTEREST_VIEWS_COUNT_MODE_KEY, next);
+			} catch {}
+			return next;
+		});
+		// Reveal the label for a moment so the mode that was just picked names
+		// itself, rather than leaving two indistinguishable numbers.
+		setShowCountLabel(true);
+		if (countLabelHideTimerRef.current) clearTimeout(countLabelHideTimerRef.current);
+		countLabelHideTimerRef.current = setTimeout(() => setShowCountLabel(false), 2500);
+	}, []);
+
+	const handleSetActiveTab = useCallback(
+		(nextTab: InterestTab) => {
+			const nextParams = new URLSearchParams(searchParams);
+			// Always explicitly set the tab in the URL so our new default setting doesn't override it
+			nextParams.set("tab", nextTab);
+			setSearchParams(nextParams, { replace: true });
+			setJustSwitchedTabs((prev) => (prev.has(nextTab) ? prev : new Set(prev).add(nextTab)));
+		},
+		[searchParams, setSearchParams],
+	);
+
+	// Read on tap only, so the rows' open handler keeps one identity while
+	// the lists refresh underneath it.
+	const viewsRef = useRef(views);
+	viewsRef.current = views;
+	const tapsRef = useRef(taps);
+	tapsRef.current = taps;
+
+	const handleOpenProfile = useCallback(
+		(profileId: string) => {
+			// Handed on so a profile Grindr won't show any more (a block, a
+			// deleted account) still opens with the name and picture seen here.
+			const item =
+				viewsRef.current.find((entry) => entry.profileId === profileId) ??
+				tapsRef.current.find((entry) => entry.profileId === profileId);
+			navigate(`/profile/${profileId}`, {
+				state: {
+					returnTo: `${location.pathname}${location.search}`,
+					knownProfile: item
+						? { name: item.displayName, imageHash: item.imageHash }
+						: undefined,
+				},
+			});
+		},
+		[navigate, location.pathname, location.search],
+	);
+
+	const handleTouchStart = useCallback((event: TouchEvent<HTMLDivElement>) => {
+		touchStartXRef.current = event.touches[0]?.clientX ?? null;
+	}, []);
+
+	const handleTouchEnd = useCallback(
+		(event: TouchEvent<HTMLDivElement>) => {
+			const startX = touchStartXRef.current;
+			if (startX == null) {
+				return;
+			}
+
+			const endX = event.changedTouches[0]?.clientX ?? startX;
+			const deltaX = startX - endX;
+
+			const isViewsFirst = defaultSetting === "views";
+			const leftTab = isViewsFirst ? "views" : "taps";
+			const rightTab = isViewsFirst ? "taps" : "views";
+
+			// Swipe left (positive deltaX) -> move to the right tab
+			if (deltaX > 70 && activeTab === leftTab) {
+				handleSetActiveTab(rightTab);
+			}
+
+			// Swipe right (negative deltaX) -> move to the left tab
+			if (deltaX < -70 && activeTab === rightTab) {
+				handleSetActiveTab(leftTab);
+			}
+
+			touchStartXRef.current = null;
+		},
+		[activeTab, handleSetActiveTab, defaultSetting],
+	);
+
+	return (
+		<>
+		<PullToRefreshContainer
+			className="app-screen flex h-dvh flex-col w-full !px-0 !pb-0 overflow-x-hidden"
+			contentClassName="flex flex-1 flex-col min-h-0"
+			style={{ overflow: "visible", overflowX: "hidden" }}
+			onRefresh={handleRefresh}
+			isDisabled={isLoading}
+			isAtTop={() => (feedContainerRef.current?.scrollTop ?? 0) <= 0}
+			refreshingLabel={t("interest_page.refreshing", { tab: t(`interest_page.tabs.${activeTab}`) })}
+			spinnerColor="var(--accent)"
+		>
+			{/* Header */}
+			<header className="relative z-20 flex shrink-0 flex-col pb-3 pointer-events-none">
+				<PageHeaderBackground color="var(--accent)" />
+				<div className="pointer-events-auto flex flex-col gap-3 mx-auto w-full max-w-4xl">
+					<div className="px-[var(--app-px)] flex items-center justify-between">
+						<h1 className="app-title">{t("interest_page.title")}</h1>
+						{developerMode && showDebugInfo && (
+							<button
+								onClick={() => handleSetDemoMode((demoMode + 1) % 4)}
+								className="text-[10px] font-bold bg-white/10 hover:bg-white/20 px-3 py-1 rounded-full text-white/40 transition-colors uppercase tracking-widest"
+							>
+								Demo: {["Off", "Taps", "Visitors", "Both"][demoMode]}
+							</button>
+						)}
+					</div>
+
+					<div className="flex flex-col gap-3">
+						<div className="flex h-12 items-center justify-between gap-2 pl-[var(--app-px)] pr-6 -mt-1">
+							{/*
+								Horizontally scrollable rather than wrapping: with both
+								view controls expanded the group can outgrow a narrow
+								phone, and nudging it sideways beats reflowing the
+								header or letting it clip the count pill.
+							*/}
+							<div className="flex min-w-0 items-center gap-2 overflow-x-auto">
+								<InterestTabs
+									activeTab={activeTab}
+									onViewsClick={() => handleSetActiveTab("views")}
+									onTapsClick={() => handleSetActiveTab("taps")}
+									firstTab={defaultSetting}
+									shouldBounce={shouldBounce}
+									newViewsCount={newViewsCount}
+									newTapsCount={newTapsCount}
+								/>
+								{activeTab === "views" && (
+									<>
+										<ViewsSortToggle sort={viewsSort} onToggle={handleToggleViewsSort} />
+										<ViewsWindowToggle
+											viewsWindow={viewsWindow}
+											onToggle={handleCycleViewsWindow}
+										/>
+									</>
+								)}
+							</div>
+
+							{/* Grindr's own total drops people as they're blocked, so in the
+							    unfiltered Views scope this doubles as a switch to the real
+							    total. The windowed counts are already computed from the
+							    local list, which never lost those rows in the first place. */}
+							<button
+								type="button"
+								onClick={canToggleCountMode ? handleToggleViewsCountMode : undefined}
+								title={canToggleCountMode ? t("interest_page.count.toggle_hint", { defaultValue: "Tap to switch between Grindr's count and the real one, which still counts the people you blocked" }) : undefined}
+								aria-label={canToggleCountMode ? t("interest_page.count.toggle_hint", { defaultValue: "Tap to switch between Grindr's count and the real one, which still counts the people you blocked" }) : undefined}
+								className={cn(
+									"glass-pill flex h-8 items-center justify-center overflow-hidden shrink-0 transition-all duration-500 ease-in-out",
+									showCountLabel ? "pl-4 pr-4" : "px-3 min-w-[40px]",
+									isRealCount ? "text-[var(--accent)]" : "neutral",
+									canToggleCountMode ? "active:scale-95" : "cursor-default",
+								)}
+								style={{ "--pill-color": "var(--accent)" } as CSSProperties}
+							>
+								<div className="flex items-center justify-center">
+									<div
+										className={cn(
+											"flex transition-all duration-500 ease-in-out overflow-hidden",
+											showCountLabel ? "opacity-100 max-w-[200px]" : "opacity-0 max-w-0 pointer-events-none"
+										)}
+									>
+										<p className={cn(
+											"text-[10px] font-bold uppercase tracking-widest leading-none whitespace-nowrap mr-2",
+											isRealCount ? "text-[var(--accent)]" : "text-[var(--text-muted)]",
+										)}>
+											{activeTab === "views"
+												? viewsWindow === "all"
+													? isRealCount
+														? t("interest_page.count.real_viewed", { defaultValue: "Real" })
+														: t("interest_page.total_viewed_count")
+													: t("interest_page.shown_count")
+												: t("interest_page.total_taps_count")}
+										</p>
+									</div>
+									<div className="relative flex items-center justify-center">
+										<p className={cn(
+											"text-sm font-bold leading-none tabular-nums shrink-0 transition-opacity duration-300",
+											isRealCount ? "text-[var(--accent)]" : "text-[var(--text-muted)]",
+											(isFetching && !isQueryLoading) || isDemoLoading ? "opacity-0" : "opacity-100"
+										)}>
+											{activeTab === "views"
+												? viewsWindow === "all"
+													? isRealCount
+														? realViewedCount
+														: viewedCount
+													: activeItems.length
+												: taps.length}
+										</p>
+										{((isFetching && !isQueryLoading) || isDemoLoading) && (
+											<div className="absolute inset-0 flex items-center justify-center">
+												<RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--text-muted)]" />
+											</div>
+										)}
+									</div>
+								</div>
+							</button>
+						</div>
+					</div>
+				</div>
+			</header>
+
+			<FeedScrollContainer
+				ref={feedContainerRef}
+				onTouchStart={handleTouchStart}
+				onTouchEnd={handleTouchEnd}
+				className={cn("transition-transform duration-500 ease-in-out", shouldBounce && "-translate-x-8")}
+			>
+				<div className="mx-auto w-full max-w-4xl pb-[calc(env(safe-area-inset-bottom,0px)+120px)] px-0">
+					{(isLoading && (activeItems.length === 0 || isDemoLoading)) ? (
+						<div className="border-t border-[var(--border)]/10">
+							{Array.from({ length: 8 }).map((_, i) => (
+								<InterestSkeleton key={i} mode={activeTab} />
+							))}
+						</div>
+					) : (
+						<div className="flex flex-col">
+							{(queryError || (!isLoading && activeItems.length === 0)) && (
+								<div className="px-[var(--app-px)] py-4 space-y-4">
+									{queryError ? (
+										<ErrorState
+											title={t("interest_page.error_load", { tab: t(`interest_page.tabs.${activeTab}`) })}
+											description={queryError instanceof Error ? queryError.message : String(queryError)}
+											onRetry={handleRefresh}
+										/>
+									) : null}
+
+									{!isLoading && !queryError && activeItems.length === 0 ? (
+										<EmptyState
+											title={
+												isWindowEmptied
+													? t("interest_page.empty_window")
+													: t(`interest_page.empty_${activeTab}`)
+											}
+											description={
+												isWindowEmptied
+													? t("interest_page.empty_window_desc", {
+															period: t(`interest_page.window_long.${viewsWindow}`),
+														})
+													: t(`interest_page.empty_${activeTab}_desc`)
+											}
+										/>
+									) : null}
+								</div>
+							)}
+
+							{activeItems.length > 0 && (
+								<div className="flex flex-col">
+									{displayedItems.map((item, index) => (
+										<InterestRow
+											key={`${activeTab}-${item.profileId}-${item.timestamp ?? "na"}`}
+											item={item}
+											mode={activeTab}
+											onOpenProfile={handleOpenProfile}
+											now={nowTimestamp}
+											isFirst={index === 0}
+											isBlocked={isProfileBlocked(item.profileId)}
+											rank={isRankedViews ? index + 1 : null}
+											nickname={localNicknames[item.profileId]}
+										/>
+									))}
+
+									{(hasMoreItems || isPending) && (
+										<div
+											ref={loadMoreTriggerRef}
+											className="flex w-full items-center justify-center p-6"
+										>
+											<RefreshCw
+												className={cn(
+													"h-5 w-5 text-[var(--text-muted)] transition-all duration-200",
+													isPending ? "animate-spin opacity-40" : "opacity-0"
+												)}
+											/>
+										</div>
+									)}
+								</div>
+							)}
+						</div>
+					)}
+				</div>
+			</FeedScrollContainer>
+		</PullToRefreshContainer>
+		{showOnboarding && activeTab === "views" && (
+			<InterestOnboardingModal
+				onClose={handleCloseOnboarding}
+				onConfirm={handleAcknowledgeOnboarding}
+			/>
+		)}
+	</>
+	);
+}
